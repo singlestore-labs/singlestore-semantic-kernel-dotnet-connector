@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build all library targets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build SingleStore.SemanticKernel/SingleStore.SemanticKernel.csproj --configuration Release
+
+  modern-tests:
+    name: Tests (${{ matrix.framework }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        framework:
+          - net8.0
+          - net10.0
+
+    services:
+      singlestore:
+        image: ghcr.io/singlestore-labs/singlestoredb-dev:latest
+        env:
+          ROOT_PASSWORD: test
+        ports:
+          - 3306:3306
+
+    env:
+      SINGLESTORE_HOST: 127.0.0.1
+      SINGLESTORE_PORT: 3306
+      SINGLESTORE_ROOT: root
+      SINGLESTORE_PASSWORD: test
+      SINGLESTORE_DATABASE: testdb
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDKs
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Run unit tests
+        run: dotnet test SingleStore.SemanticKernel.UnitTests/SingleStore.SemanticKernel.UnitTests.csproj --framework ${{ matrix.framework }} --configuration Release
+
+      - name: Run integration tests
+        run: dotnet test SingleStore.SemanticKernel.IntegrationTests/SingleStore.SemanticKernel.IntegrationTests.csproj --framework ${{ matrix.framework }} --configuration Release
+
+  net-framework-tests:
+    name: Unit tests (net462)
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Run unit tests
+        run: dotnet test SingleStore.SemanticKernel.UnitTests/SingleStore.SemanticKernel.UnitTests.csproj --framework net462 --configuration Release
