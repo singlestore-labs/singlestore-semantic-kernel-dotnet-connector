@@ -1,5 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using Microsoft.Extensions.VectorData;
+using SingleStoreConnector;
 
 namespace SingleStore.SemanticKernel;
 
@@ -11,6 +13,70 @@ namespace SingleStore.SemanticKernel;
 public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, TRecord>,
     IKeywordHybridSearchable<TRecord> where TKey : notnull where TRecord : class
 {
+    /// <summary>Data source used to interact with the database.</summary>
+    private readonly SingleStoreDataSource _dataSource;
+
+    private readonly SingleStoreDataSourceArc? _dataSourceArc;
+    private readonly string _databaseName;
+
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SingleStoreCollection{TKey, TRecord}" /> class.
+    /// </summary>
+    /// <param name="dataSource">The data source to use for connecting to the database.</param>
+    /// <param name="name">The name of the collection.</param>
+    /// <param name="ownsDataSource">
+    ///     A value indicating whether <paramref name="dataSource" /> is disposed when the collection
+    ///     is disposed.
+    /// </param>
+    /// <param name="options">Optional configuration options for this class.</param>
+    [RequiresDynamicCode(
+        "This constructor is incompatible with NativeAOT. For dynamic mapping via Dictionary<string, object?>, instantiate SingleStoreDynamicCollection instead.")]
+    [RequiresUnreferencedCode(
+        "This constructor is incompatible with trimming. For dynamic mapping via Dictionary<string, object?>, instantiate SingleStoreDynamicCollection instead")]
+    public SingleStoreCollection(SingleStoreDataSource dataSource,
+        string name,
+        bool ownsDataSource,
+        SingleStoreCollectionOptions? options = default) : this(dataSource,
+        ownsDataSource ? new SingleStoreDataSourceArc(dataSource) : null,
+        name,
+        options)
+    {
+    }
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="SingleStoreCollection{TKey, TRecord}" /> class.
+    /// </summary>
+    /// <param name="connectionString">SingleStore database connection string.</param>
+    /// <param name="name">The name of the collection.</param>
+    /// <param name="options">Optional configuration options for this class.</param>
+    [RequiresDynamicCode(
+        "This constructor is incompatible with NativeAOT. For dynamic mapping via Dictionary<string, object?>, instantiate SingleStoreDynamicCollection instead.")]
+    [RequiresUnreferencedCode(
+        "This constructor is incompatible with trimming. For dynamic mapping via Dictionary<string, object?>, instantiate SingleStoreDynamicCollection instead")]
+    public SingleStoreCollection(string connectionString, string name, SingleStoreCollectionOptions? options = default)
+        : this(new SingleStoreDataSource(connectionString), name, true, options)
+    {
+        Verify.NotNullOrWhiteSpace(connectionString);
+    }
+
+    internal SingleStoreCollection(SingleStoreDataSource dataSource,
+        SingleStoreDataSourceArc? dataSourceArc,
+        string name,
+        SingleStoreCollectionOptions? options)
+    {
+        Verify.NotNullOrWhiteSpace(name);
+
+        Name = name;
+
+        _dataSource = dataSource;
+        _dataSourceArc = dataSourceArc;
+        _databaseName = new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).Database!;
+
+        // Don't add any lines after this - an exception thrown afterward would leave the reference count wrongly incremented.
+        _dataSourceArc?.IncrementReferenceCount();
+    }
+
     /// <inheritdoc />
     public override string Name { get; }
 
@@ -104,5 +170,12 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
         CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        _dataSourceArc?.Dispose();
+        base.Dispose(disposing);
     }
 }
