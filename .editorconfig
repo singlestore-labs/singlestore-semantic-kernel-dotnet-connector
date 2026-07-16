@@ -1,0 +1,15 @@
+[*]
+insert_final_newline = true
+
+[*.cs]
+max_line_length = 120
+resharper_max_line_length = 120
+
+resharper_keep_existing_declaration_parens_arrangement = false
+resharper_keep_existing_invocation_parens_arrangement = false
+resharper_keep_existing_arrangement = false
+
+resharper_wrap_parameters_style = chop_if_long
+resharper_wrap_arguments_style = chop_if_long
+resharper_wrap_before_declaration_lpar = false
+resharper_wrap_before_invocation_lpar = false
