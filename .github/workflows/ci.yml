@@ -18,7 +18,8 @@ jobs:
           include_rc: true
 
   ubuntu-tests:
-    name: Tests (Framework: ${{ matrix.framework }}, S2: ${{ matrix.singlestore_version }})
+    name: "Tests (Framework: ${{ matrix.framework }}, S2: ${{ matrix.singlestore_version }})"
+    needs: fetch-s2-versions
     runs-on: ubuntu-latest
 
     strategy:
