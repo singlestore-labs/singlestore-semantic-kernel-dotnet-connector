@@ -69,7 +69,7 @@ jobs:
       S2MS_API_KEY: ${{ secrets.S2MS_API_KEY }}
       SINGLESTORE_PORT: 3306
       SINGLESTORE_ROOT: root
-      SINGLESTORE_PASSWORD: test
+      SINGLESTORE_PASSWORD: ${{ secrets.SINGLESTORE_PASSWORD }}
       SINGLESTORE_DATABASE: testdb
 
     steps:
