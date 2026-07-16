@@ -62,17 +62,9 @@ jobs:
         run: dotnet test SingleStore.SemanticKernel.IntegrationTests/SingleStore.SemanticKernel.IntegrationTests.csproj --framework ${{ matrix.framework }} --configuration Release
 
   windows-tests:
-    name: "Test Windows (Framework: ${{ matrix.framework }}, S2: ${{ matrix.singlestore_version }})"
-    needs: fetch-s2-versions
-    runs-on: ubuntu-latest
+    name: "Test Windows"
+    runs-on: windows-latest
 
-    strategy:
-      matrix:
-        framework:
-          - net462
-        singlestore_version: ${{ fromJson(needs.fetch-s2-versions.outputs.versions)[0] }}
-#
-#    env:
 #      SINGLESTORE_HOST: 127.0.0.1
 #      SINGLESTORE_PORT: 3306
 #      SINGLESTORE_ROOT: root
@@ -89,7 +81,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Run unit tests
-        run: dotnet test SingleStore.SemanticKernel.UnitTests/SingleStore.SemanticKernel.UnitTests.csproj --framework ${{ matrix.framework }} --configuration Release
+        run: dotnet test SingleStore.SemanticKernel.UnitTests/SingleStore.SemanticKernel.UnitTests.csproj --framework net462 --configuration Release
 #
 #      - name: Run integration tests
 #        run: dotnet test SingleStore.SemanticKernel.IntegrationTests/SingleStore.SemanticKernel.IntegrationTests.csproj --framework ${{ matrix.framework }} --configuration Release
