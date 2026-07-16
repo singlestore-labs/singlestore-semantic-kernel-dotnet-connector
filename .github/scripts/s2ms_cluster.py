@@ -5,7 +5,7 @@ import sys
 import time
 from typing import Dict, Optional
 
-SQL_USER_PASSWORD = os.getenv("SQL_USER_PASSWORD")
+SQL_USER_PASSWORD = os.getenv("SINGLESTORE_PASSWORD")
 S2MS_API_KEY = os.getenv("S2MS_API_KEY")
 
 WORKSPACE_GROUP_BASE_NAME = "semantic-kernel-dotnet-connector-ci-test-cluster"

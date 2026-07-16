@@ -65,11 +65,12 @@ jobs:
     name: "Test Windows"
     runs-on: windows-latest
 
-#      SINGLESTORE_HOST: 127.0.0.1
-#      SINGLESTORE_PORT: 3306
-#      SINGLESTORE_ROOT: root
-#      SINGLESTORE_PASSWORD: test
-#      SINGLESTORE_DATABASE: testdb
+    env:
+      S2MS_API_KEY: ${{ secrets.S2MS_API_KEY }}
+      SINGLESTORE_PORT: 3306
+      SINGLESTORE_ROOT: root
+      SINGLESTORE_PASSWORD: test
+      SINGLESTORE_DATABASE: testdb
 
     steps:
       - name: Check out repository
@@ -80,8 +81,19 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Start SingleStore for SideBySide tests
+        run: |
+          python .github\workflows\s2ms_cluster.py start singlestoretest
+          $endpoint = (Get-Content -Raw WORKSPACE_ENDPOINT_FILE).Trim()
+          "SINGLESTORE_HOST=$endpoint" |
+          Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Run unit tests
         run: dotnet test SingleStore.SemanticKernel.UnitTests/SingleStore.SemanticKernel.UnitTests.csproj --framework net462 --configuration Release
-#
-#      - name: Run integration tests
-#        run: dotnet test SingleStore.SemanticKernel.IntegrationTests/SingleStore.SemanticKernel.IntegrationTests.csproj --framework ${{ matrix.framework }} --configuration Release
+
+      - name: Run integration tests
+        run: dotnet test SingleStore.SemanticKernel.IntegrationTests/SingleStore.SemanticKernel.IntegrationTests.csproj --framework net462 --configuration Release
+
+      - name: Stop SingleStore
+        if: always()
+        run: python .github/scripts/s2ms_cluster.py terminate
