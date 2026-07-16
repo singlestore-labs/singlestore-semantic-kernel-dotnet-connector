@@ -18,7 +18,7 @@ jobs:
           include_rc: true
 
   ubuntu-tests:
-    name: "Tests (Framework: ${{ matrix.framework }}, S2: ${{ matrix.singlestore_version }})"
+    name: "Test Ubuntu (Framework: ${{ matrix.framework }}, S2: ${{ matrix.singlestore_version }})"
     needs: fetch-s2-versions
     runs-on: ubuntu-latest
 
@@ -60,3 +60,36 @@ jobs:
 
       - name: Run integration tests
         run: dotnet test SingleStore.SemanticKernel.IntegrationTests/SingleStore.SemanticKernel.IntegrationTests.csproj --framework ${{ matrix.framework }} --configuration Release
+
+  windows-tests:
+    name: "Test Windows (Framework: ${{ matrix.framework }}, S2: ${{ matrix.singlestore_version }})"
+    needs: fetch-s2-versions
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        framework:
+          - net462
+        singlestore_version: ${{ fromJson(needs.fetch-s2-versions.outputs.versions)[0] }}
+#
+#    env:
+#      SINGLESTORE_HOST: 127.0.0.1
+#      SINGLESTORE_PORT: 3306
+#      SINGLESTORE_ROOT: root
+#      SINGLESTORE_PASSWORD: test
+#      SINGLESTORE_DATABASE: testdb
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDKs
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Run unit tests
+        run: dotnet test SingleStore.SemanticKernel.UnitTests/SingleStore.SemanticKernel.UnitTests.csproj --framework ${{ matrix.framework }} --configuration Release
+#
+#      - name: Run integration tests
+#        run: dotnet test SingleStore.SemanticKernel.IntegrationTests/SingleStore.SemanticKernel.IntegrationTests.csproj --framework ${{ matrix.framework }} --configuration Release
