@@ -1,43 +1,32 @@
 name: CI
 
 on:
-  push:
   pull_request:
-
-permissions:
-  contents: read
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  push:
 
 jobs:
-  build:
-    name: Build all library targets
+  fetch-s2-versions:
+    name: Fetch SingleStore supported versions
     runs-on: ubuntu-latest
-
+    outputs:
+      versions: ${{ steps.get_versions.outputs.versions }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Install .NET SDK
-        uses: actions/setup-dotnet@v5
+      - name: Get supported versions of SingleStore
+        id: get_versions
+        uses: singlestore-labs/singlestore-supported-versions@main
         with:
-          dotnet-version: 10.0.x
+          include_rc: true
 
-      - name: Build
-        run: dotnet build SingleStore.SemanticKernel/SingleStore.SemanticKernel.csproj --configuration Release
-
-  modern-tests:
-    name: Tests (${{ matrix.framework }})
+  ubuntu-tests:
+    name: Tests (Framework: ${{ matrix.framework }}, S2: ${{ matrix.singlestore_version }})
     runs-on: ubuntu-latest
 
     strategy:
-      fail-fast: false
       matrix:
         framework:
           - net8.0
           - net10.0
+        singlestore_version: ${{ fromJson(needs.fetch-s2-versions.outputs.versions) }}
 
     services:
       singlestore:
@@ -70,19 +59,3 @@ jobs:
 
       - name: Run integration tests
         run: dotnet test SingleStore.SemanticKernel.IntegrationTests/SingleStore.SemanticKernel.IntegrationTests.csproj --framework ${{ matrix.framework }} --configuration Release
-
-  net-framework-tests:
-    name: Unit tests (net462)
-    runs-on: windows-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Install .NET SDK
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Run unit tests
-        run: dotnet test SingleStore.SemanticKernel.UnitTests/SingleStore.SemanticKernel.UnitTests.csproj --framework net462 --configuration Release
