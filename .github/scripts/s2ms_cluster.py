@@ -25,6 +25,7 @@ def retry(func):
             if i == TOTAL_RETRIES - 1:
                 raise
             print(f"Attempt {i+1} failed with error: {e}.")
+            time.sleep(10)
 
 
 def create_workspace(workspace_manager):

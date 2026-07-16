@@ -8,7 +8,7 @@ public class DatabaseFixture : IDisposable
 
     public string Port { get; } = Environment.GetEnvironmentVariable("SINGLESTORE_PORT") ?? "3306";
 
-    public string User { get; } = Environment.GetEnvironmentVariable("SINGLESTORE_ROOT") ?? "root";
+    public string User { get; } = Environment.GetEnvironmentVariable("SINGLESTORE_USER") ?? "root";
 
     public string Password { get; } = Environment.GetEnvironmentVariable("SINGLESTORE_PASSWORD") ?? "1";
 
