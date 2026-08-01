@@ -15,10 +15,10 @@ environment variable:
 
 ```bash
 # Bash/Linux/macOS
-export SingleStore__ConnectionString="Host=127.0.0.1;Port=3306;Database=mydb;UserId=myuser;Password=mypassword;"
+export SingleStore__ConnectionString="Host=127.0.0.1;Port=3306;UserId=myuser;Password=mypassword;"
 
 # PowerShell
-$env:SingleStore__ConnectionString = "Host=127.0.0.1;Port=3306;Database=mydb;UserId=myuser;Password=mypassword;"
+$env:SingleStore__ConnectionString = "Host=127.0.0.1;Port=3306;UserId=myuser;Password=mypassword;"
 ```
 
 ## Benefits of Using an External Instance

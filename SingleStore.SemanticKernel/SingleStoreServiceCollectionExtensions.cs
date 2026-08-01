@@ -37,10 +37,10 @@ public static class SingleStoreServiceCollectionExtensions
             sp =>
             {
                 var dataSource = sp.GetRequiredService<SingleStoreDataSource>();
-                options = GetStoreOptions(sp, _ => options);
+                var copy = GetStoreOptions(sp, _ => options);
 
                 // The data source has been solved from the DI container, so we do not own it.
-                return new SingleStoreVectorStore(dataSource, false, options);
+                return new SingleStoreVectorStore(dataSource, false, copy);
             },
             lifetime));
 
