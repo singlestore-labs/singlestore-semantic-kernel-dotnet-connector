@@ -65,6 +65,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
         SingleStoreCollectionOptions? options)
     {
         Verify.NotNullOrWhiteSpace(name);
+        Verify.NotNull(dataSource);
 
         Name = name;
 

@@ -37,7 +37,7 @@ public sealed class SingleStoreVectorStore : VectorStore
         _dataSource = dataSource;
         _dataSourceArc = ownsDataSource ? new SingleStoreDataSourceArc(dataSource) : null;
         _databaseName = new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).Database!;
-        
+
         // Don't add any lines after this - an exception thrown afterward would leave the reference count wrongly incremented.
         _dataSourceArc?.IncrementReferenceCount();
     }
