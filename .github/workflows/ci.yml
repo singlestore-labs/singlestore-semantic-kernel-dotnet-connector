@@ -74,7 +74,7 @@ jobs:
         run: |
           python .github/scripts/s2ms_cluster.py start singlestoretest
           $endpoint = (Get-Content -Raw WORKSPACE_ENDPOINT_FILE).Trim()
-          "SingleStore__ConnectionString=Server=$endpoint;Port=3306;User ID=admin;Password=$env:SINGLESTORE_PASSWORD;Database=testdb" |
+          "SingleStore__ConnectionString=Server=$endpoint;Port=3306;User ID=admin;Password=$env:SINGLESTORE_PASSWORD;" |
           Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install .NET SDKs

@@ -57,7 +57,6 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     public SingleStoreCollection(string connectionString, string name, SingleStoreCollectionOptions? options = default)
         : this(new SingleStoreDataSource(connectionString), name, true, options)
     {
-        Verify.NotNullOrWhiteSpace(connectionString);
     }
 
     internal SingleStoreCollection(SingleStoreDataSource dataSource,

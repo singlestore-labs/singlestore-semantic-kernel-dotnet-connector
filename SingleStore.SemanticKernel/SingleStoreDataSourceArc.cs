@@ -7,7 +7,7 @@ namespace SingleStore.SemanticKernel;
 /// </summary>
 internal sealed class SingleStoreDataSourceArc(SingleStoreDataSource dataSource) : IDisposable
 {
-    private int _referenceCount = 1;
+    private int _referenceCount;
 
     public void Dispose()
     {
