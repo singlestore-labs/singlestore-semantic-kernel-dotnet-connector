@@ -6,7 +6,7 @@ using SingleStoreConnector;
 namespace SingleStore.SemanticKernel;
 
 /// <summary>
-///     Represents a vector store implementation using SingleStore.
+/// Represents a vector store implementation using SingleStore.
 /// </summary>
 public sealed class SingleStoreVectorStore : VectorStore
 {
@@ -19,12 +19,12 @@ public sealed class SingleStoreVectorStore : VectorStore
     private readonly IEmbeddingGenerator? _embeddingGenerator;
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SingleStoreVectorStore" /> class.
+    /// Initializes a new instance of the <see cref="SingleStoreVectorStore" /> class.
     /// </summary>
     /// <param name="dataSource">SingleStore data source.</param>
     /// <param name="ownsDataSource">
-    ///     A value indicating whether <paramref name="dataSource" /> is disposed when this instance
-    ///     of <see cref="SingleStoreVectorStore" /> is disposed.
+    /// A value indicating whether <paramref name="dataSource" /> is disposed when this instance
+    /// of <see cref="SingleStoreVectorStore" /> is disposed.
     /// </param>
     /// <param name="options">Optional configuration options for this class</param>
     public SingleStoreVectorStore(SingleStoreDataSource dataSource,
@@ -43,7 +43,7 @@ public sealed class SingleStoreVectorStore : VectorStore
     }
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SingleStoreVectorStore" /> class.
+    /// Initializes a new instance of the <see cref="SingleStoreVectorStore" /> class.
     /// </summary>
     /// <param name="connectionString">SingleStore database connection string.</param>
     /// <param name="options">Optional configuration options for this class.</param>

@@ -3,7 +3,7 @@ using SingleStoreConnector;
 namespace SingleStore.SemanticKernel;
 
 /// <summary>
-///     A reference-counting wrapper around an <see cref="SingleStoreDataSource" /> instance.
+/// A reference-counting wrapper around an <see cref="SingleStoreDataSource" /> instance.
 /// </summary>
 internal sealed class SingleStoreDataSourceArc(SingleStoreDataSource dataSource) : IDisposable
 {

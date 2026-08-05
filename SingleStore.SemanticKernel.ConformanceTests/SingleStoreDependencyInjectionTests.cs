@@ -72,7 +72,8 @@ public class SingleStoreDependencyInjectionTests : DependencyInjectionTests<Sing
         IServiceCollection services = new ServiceCollection();
 
         Assert.Throws<ArgumentNullException>(() =>
-            services.AddSingleStoreCollection<string, Record>("notNull", connectionStringProvider: null!));
+            services.AddSingleStoreCollection<string, Record>("notNull",
+                connectionStringProvider: null!));
         Assert.Throws<ArgumentNullException>(() =>
             services.AddKeyedSingleStoreCollection<string, Record>("notNull",
                 "notNull",
@@ -84,12 +85,14 @@ public class SingleStoreDependencyInjectionTests : DependencyInjectionTests<Sing
     {
         IServiceCollection services = new ServiceCollection();
 
-        Assert.Throws<ArgumentNullException>(() => services.AddSingleStoreVectorStore(connectionString: null!));
+        Assert.Throws<ArgumentNullException>(() =>
+            services.AddSingleStoreVectorStore(connectionString: null!));
         Assert.Throws<ArgumentNullException>(() =>
             services.AddKeyedSingleStoreVectorStore("notNull", connectionString: null!));
         Assert.Throws<ArgumentNullException>(() =>
             services.AddSingleStoreCollection<string, Record>("notNull", connectionString: null!));
-        Assert.Throws<ArgumentException>(() => services.AddSingleStoreCollection<string, Record>("notNull", ""));
+        Assert.Throws<ArgumentException>(() =>
+            services.AddSingleStoreCollection<string, Record>("notNull", ""));
         Assert.Throws<ArgumentNullException>(() =>
             services.AddKeyedSingleStoreCollection<string, Record>("notNull", "notNull", connectionString: null!));
         Assert.Throws<ArgumentException>(() =>

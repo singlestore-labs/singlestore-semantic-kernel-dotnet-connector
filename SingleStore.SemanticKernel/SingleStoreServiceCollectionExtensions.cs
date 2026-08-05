@@ -7,8 +7,8 @@ using SingleStoreConnector;
 namespace SingleStore.SemanticKernel;
 
 /// <summary>
-///     Extension methods to register SingleStore <see cref="VectorStore" /> instances on an
-///     <see cref="IServiceCollection" />.
+/// Extension methods to register SingleStore <see cref="VectorStore" /> instances on an
+/// <see cref="IServiceCollection" />.
 /// </summary>
 public static class SingleStoreServiceCollectionExtensions
 {
@@ -20,8 +20,8 @@ public static class SingleStoreServiceCollectionExtensions
 
 
     /// <summary>
-    ///     Register a <see cref="SingleStoreVectorStore" /> as <see cref="VectorStore" />, where the
-    ///     <see cref="SingleStoreDataSource" /> is retrieved from the dependency injection container.
+    /// Register a <see cref="SingleStoreVectorStore" /> as <see cref="VectorStore" />, where the
+    /// <see cref="SingleStoreDataSource" /> is retrieved from the dependency injection container.
     /// </summary>
     /// <param name="services">The <see cref="IServiceCollection" /> to register the <see cref="SingleStoreVectorStore" /> on.</param>
     /// <param name="options">Optional options to further configure the <see cref="VectorStore" />.</param>
@@ -52,9 +52,9 @@ public static class SingleStoreServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     Registers a <see cref="SingleStoreVectorStore" /> as <see cref="VectorStore" />, with the specified connection
-    ///     string
-    ///     and service lifetime.
+    /// Registers a <see cref="SingleStoreVectorStore" /> as <see cref="VectorStore" />, with the specified connection
+    /// string
+    /// and service lifetime.
     /// </summary>
     /// <inheritdoc
     ///     cref="AddKeyedSingleStoreVectorStore(IServiceCollection, object, string, SingleStoreVectorStoreOptions?, ServiceLifetime)" />
@@ -69,9 +69,9 @@ public static class SingleStoreServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     Registers a keyed <see cref="SingleStoreVectorStore" /> as <see cref="VectorStore" />, with the specified
-    ///     connection
-    ///     string and service lifetime.
+    /// Registers a keyed <see cref="SingleStoreVectorStore" /> as <see cref="VectorStore" />, with the specified
+    /// connection
+    /// string and service lifetime.
     /// </summary>
     /// <param name="services">The <see cref="IServiceCollection" /> to register the <see cref="SingleStoreVectorStore" /> on.</param>
     /// <param name="serviceKey">The key with which to associate the vector store.</param>
@@ -91,9 +91,9 @@ public static class SingleStoreServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     Registers a <see cref="SingleStoreVectorStore" /> as <see cref="VectorStore" />, with the specified connection
-    ///     string
-    ///     and service lifetime.
+    /// Registers a <see cref="SingleStoreVectorStore" /> as <see cref="VectorStore" />, with the specified connection
+    /// string
+    /// and service lifetime.
     /// </summary>
     /// <inheritdoc
     ///     cref="AddVectorStore(IServiceCollection, object?, Func{IServiceProvider, string}, Func{IServiceProvider, SingleStoreVectorStoreOptions?}?, ServiceLifetime)" />
@@ -117,9 +117,9 @@ public static class SingleStoreServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     Registers a keyed <see cref="SingleStoreVectorStore" /> as <see cref="VectorStore" />, with the specified
-    ///     connection
-    ///     string and service lifetime.
+    /// Registers a keyed <see cref="SingleStoreVectorStore" /> as <see cref="VectorStore" />, with the specified
+    /// connection
+    /// string and service lifetime.
     /// </summary>
     /// <param name="services">The <see cref="IServiceCollection" /> to register the <see cref="SingleStoreVectorStore" /> on.</param>
     /// <param name="serviceKey">The key with which to associate the store.</param>
@@ -156,20 +156,20 @@ public static class SingleStoreServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     Register a <see cref="SingleStoreCollection{TKey, TRecord}" /> where the <see cref="SingleStoreDataSource" /> is
-    ///     retrieved from the dependency injection container.
+    /// Register a <see cref="SingleStoreCollection{TKey, TRecord}" /> where the <see cref="SingleStoreDataSource" /> is
+    /// retrieved from the dependency injection container.
     /// </summary>
     /// <typeparam name="TKey">The type of the key.</typeparam>
     /// <typeparam name="TRecord">The type of the record.</typeparam>
     /// <param name="services">
-    ///     The <see cref="IServiceCollection" /> to register the
-    ///     <see cref="VectorStoreCollection{TKey, TRecord}" /> on.
+    /// The <see cref="IServiceCollection" /> to register the
+    /// <see cref="VectorStoreCollection{TKey, TRecord}" /> on.
     /// </param>
     /// <param name="name">The name of the collection.</param>
     /// <param name="options">Optional options to further configure the <see cref="VectorStoreCollection{TKey, TRecord}" />.</param>
     /// <param name="lifetime">
-    ///     The service lifetime for the store. It needs to match <see cref="SingleStoreDataSource" /> lifetime.
-    ///     Defaults to <see cref="ServiceLifetime.Singleton" />.
+    /// The service lifetime for the store. It needs to match <see cref="SingleStoreDataSource" /> lifetime.
+    /// Defaults to <see cref="ServiceLifetime.Singleton" />.
     /// </param>
     /// <returns>Service collection.</returns>
     [RequiresDynamicCode(DynamicCodeMessage)]
@@ -199,8 +199,8 @@ public static class SingleStoreServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     Registers a <see cref="SingleStoreCollection{TKey, TRecord}" /> as
-    ///     <see cref="VectorStoreCollection{TKey, TRecord}" />, with the specified connection string and service lifetime.
+    /// Registers a <see cref="SingleStoreCollection{TKey, TRecord}" /> as
+    /// <see cref="VectorStoreCollection{TKey, TRecord}" />, with the specified connection string and service lifetime.
     /// </summary>
     /// <inheritdoc
     ///     cref="AddKeyedSingleStoreCollection{TKey, TRecord}(IServiceCollection, object, string, string, SingleStoreCollectionOptions?, ServiceLifetime)" />
@@ -222,14 +222,14 @@ public static class SingleStoreServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     Registers a keyed <see cref="SingleStoreCollection{TKey, TRecord}" /> as
-    ///     <see cref="VectorStoreCollection{TKey, TRecord}" />, with the specified connection string and service lifetime.
+    /// Registers a keyed <see cref="SingleStoreCollection{TKey, TRecord}" /> as
+    /// <see cref="VectorStoreCollection{TKey, TRecord}" />, with the specified connection string and service lifetime.
     /// </summary>
     /// <typeparam name="TKey">The type of the key.</typeparam>
     /// <typeparam name="TRecord">The type of the record.</typeparam>
     /// <param name="services">
-    ///     The <see cref="IServiceCollection" /> to register the
-    ///     <see cref="VectorStoreCollection{TKey, TRecord}" /> on.
+    /// The <see cref="IServiceCollection" /> to register the
+    /// <see cref="VectorStoreCollection{TKey, TRecord}" /> on.
     /// </param>
     /// <param name="serviceKey">The key with which to associate the collection.</param>
     /// <param name="name">The name of the collection.</param>
@@ -256,9 +256,9 @@ public static class SingleStoreServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     Registers a <see cref="SingleStoreCollection{TKey, TRecord}" /> as
-    ///     <see cref="VectorStoreCollection{TKey, TRecord}" />
-    ///     , with the specified connection string and service lifetime.
+    /// Registers a <see cref="SingleStoreCollection{TKey, TRecord}" /> as
+    /// <see cref="VectorStoreCollection{TKey, TRecord}" />
+    /// , with the specified connection string and service lifetime.
     /// </summary>
     /// <inheritdoc
     ///     cref="AddKeyedSingleStoreCollection{TKey, TRecord}(IServiceCollection, object?, string, Func{IServiceProvider, string}, Func{IServiceProvider, SingleStoreCollectionOptions?}?, ServiceLifetime)" />
@@ -278,12 +278,12 @@ public static class SingleStoreServiceCollectionExtensions
     }
 
     /// <summary>
-    ///     Registers a keyed <see cref="SingleStoreCollection{TKey, TRecord}" /> as
-    ///     <see cref="VectorStoreCollection{TKey, TRecord}" />, with the specified connection string and service lifetime.
+    /// Registers a keyed <see cref="SingleStoreCollection{TKey, TRecord}" /> as
+    /// <see cref="VectorStoreCollection{TKey, TRecord}" />, with the specified connection string and service lifetime.
     /// </summary>
     /// <param name="services">
-    ///     The <see cref="IServiceCollection" /> to register the
-    ///     <see cref="VectorStoreCollection{TKey, TRecord}" /> on.
+    /// The <see cref="IServiceCollection" /> to register the
+    /// <see cref="VectorStoreCollection{TKey, TRecord}" /> on.
     /// </param>
     /// <param name="serviceKey">The key with which to associate the collection.</param>
     /// <param name="name">The name of the collection.</param>

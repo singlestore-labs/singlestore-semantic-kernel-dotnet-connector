@@ -6,7 +6,7 @@ namespace SingleStore.SemanticKernel;
 internal static class Verify
 {
     /// <summary>
-    ///     Equivalent of ArgumentNullException.ThrowIfNull
+    /// Equivalent of ArgumentNullException.ThrowIfNull
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static void NotNull([NotNull] object? obj,
@@ -15,10 +15,7 @@ internal static class Verify
 #if NET
         ArgumentNullException.ThrowIfNull(obj, paramName);
 #else
-        if (obj is null)
-        {
-            ThrowArgumentNullException(paramName);
-        }
+        if (obj is null) ThrowArgumentNullException(paramName);
 #endif
     }
 
@@ -30,10 +27,7 @@ internal static class Verify
         ArgumentException.ThrowIfNullOrWhiteSpace(str, paramName);
 #else
         NotNull(str, paramName);
-        if (string.IsNullOrWhiteSpace(str))
-        {
-            ThrowArgumentWhiteSpaceException(paramName);
-        }
+        if (string.IsNullOrWhiteSpace(str)) ThrowArgumentWhiteSpaceException(paramName);
 #endif
     }
 

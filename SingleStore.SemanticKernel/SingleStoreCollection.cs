@@ -6,7 +6,7 @@ using SingleStoreConnector;
 namespace SingleStore.SemanticKernel;
 
 /// <summary>
-///     Represents a collection of vector store records in a SingleStore database.
+/// Represents a collection of vector store records in a SingleStore database.
 /// </summary>
 /// <typeparam name="TKey">The type of the key.</typeparam>
 /// <typeparam name="TRecord">The type of the record.</typeparam>
@@ -21,13 +21,13 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
 
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SingleStoreCollection{TKey, TRecord}" /> class.
+    /// Initializes a new instance of the <see cref="SingleStoreCollection{TKey, TRecord}" /> class.
     /// </summary>
     /// <param name="dataSource">The data source to use for connecting to the database.</param>
     /// <param name="name">The name of the collection.</param>
     /// <param name="ownsDataSource">
-    ///     A value indicating whether <paramref name="dataSource" /> is disposed when the collection
-    ///     is disposed.
+    /// A value indicating whether <paramref name="dataSource" /> is disposed when the collection
+    /// is disposed.
     /// </param>
     /// <param name="options">Optional configuration options for this class.</param>
     [RequiresDynamicCode(
@@ -45,7 +45,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     }
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="SingleStoreCollection{TKey, TRecord}" /> class.
+    /// Initializes a new instance of the <see cref="SingleStoreCollection{TKey, TRecord}" /> class.
     /// </summary>
     /// <param name="connectionString">SingleStore database connection string.</param>
     /// <param name="name">The name of the collection.</param>
