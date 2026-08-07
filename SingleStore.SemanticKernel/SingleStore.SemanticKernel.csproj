@@ -6,6 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <PolySharpIncludeRuntimeSupportedAttributes>true</PolySharpIncludeRuntimeSupportedAttributes>
+        <NoWarn>$(NoWarn);MEVD9001</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -16,5 +17,9 @@
         </PackageReference>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2"/>
         <PackageReference Include="SingleStoreConnector" Version="1.4.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="SingleStore.SemanticKernel.UnitTests"/>
     </ItemGroup>
 </Project>

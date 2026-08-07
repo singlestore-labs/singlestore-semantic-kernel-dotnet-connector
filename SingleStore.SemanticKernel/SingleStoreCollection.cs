@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using Microsoft.Extensions.VectorData;
+using Microsoft.Extensions.VectorData.ProviderServices;
 using SingleStoreConnector;
 
 namespace SingleStore.SemanticKernel;
@@ -18,6 +19,9 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
 
     private readonly SingleStoreDataSourceArc? _dataSourceArc;
     private readonly string _databaseName;
+
+    /// <summary>The model for this collection.</summary>
+    private readonly CollectionModel _model;
 
 
     /// <summary>
@@ -44,6 +48,30 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     {
     }
 
+    [RequiresDynamicCode(
+        "This constructor is incompatible with NativeAOT. For dynamic mapping via Dictionary<string, object?>, instantiate SingleStoreDynamicCollection instead.")]
+    [RequiresUnreferencedCode(
+        "This constructor is incompatible with trimming. For dynamic mapping via Dictionary<string, object?>, instantiate SingleStoreDynamicCollection instead.")]
+    internal SingleStoreCollection(SingleStoreDataSource dataSource,
+        SingleStoreDataSourceArc? dataSourceArc,
+        string name,
+        SingleStoreCollectionOptions? options)
+        : this(
+            dataSource,
+            dataSourceArc,
+            name,
+            static options => typeof(TRecord) == typeof(Dictionary<string, object?>)
+                ? throw new NotSupportedException(
+                    VectorDataStrings.NonDynamicCollectionWithDictionaryNotSupported(
+                        typeof(SingleStoreDynamicCollection)))
+                : new SingleStoreModelBuilder().Build(typeof(TRecord),
+                    typeof(TKey),
+                    options.Definition,
+                    options.EmbeddingGenerator),
+            options)
+    {
+    }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="SingleStoreCollection{TKey, TRecord}" /> class.
     /// </summary>
@@ -62,12 +90,16 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     internal SingleStoreCollection(SingleStoreDataSource dataSource,
         SingleStoreDataSourceArc? dataSourceArc,
         string name,
+        Func<SingleStoreCollectionOptions, CollectionModel> modelFactory,
         SingleStoreCollectionOptions? options)
     {
         Verify.NotNullOrWhiteSpace(name);
         Verify.NotNull(dataSource);
 
+        options ??= SingleStoreCollectionOptions.Default;
+
         Name = name;
+        _model = modelFactory(options);
 
         _dataSource = dataSource;
         _dataSourceArc = dataSourceArc;

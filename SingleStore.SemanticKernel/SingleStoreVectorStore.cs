@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
+using Microsoft.Extensions.VectorData.ProviderServices;
 using SingleStoreConnector;
 
 namespace SingleStore.SemanticKernel;
@@ -59,17 +60,47 @@ public sealed class SingleStoreVectorStore : VectorStore
         "This API is not compatible with NativeAOT. For dynamic mapping via Dictionary<string, object?>, use GetDynamicCollection() instead.")]
     [RequiresUnreferencedCode(
         "This API is not compatible with trimming. For dynamic mapping via Dictionary<string, object?>, use GetDynamicCollection() instead.")]
+#if NET
+    public override SingleStoreCollection<TKey, TRecord> GetCollection<TKey, TRecord>(string name,
+        VectorStoreCollectionDefinition? definition = null)
+#else
     public override VectorStoreCollection<TKey, TRecord> GetCollection<TKey, TRecord>(string name,
         VectorStoreCollectionDefinition? definition = null)
+#endif
     {
-        throw new NotImplementedException();
+        if (typeof(TRecord) == typeof(Dictionary<string, object?>))
+            throw new ArgumentException(VectorDataStrings.GetCollectionWithDictionaryNotSupported);
+
+        return new SingleStoreCollection<TKey, TRecord>(
+            _dataSource,
+            _dataSourceArc,
+            name,
+            new SingleStoreCollectionOptions
+            {
+                Definition = definition,
+                EmbeddingGenerator = _embeddingGenerator
+            });
     }
 
     /// <inheritdoc />
+#if NET
+    public override SingleStoreCollection<object, Dictionary<string, object?>> GetDynamicCollection(string name,
+        VectorStoreCollectionDefinition definition)
+#else
     public override VectorStoreCollection<object, Dictionary<string, object?>> GetDynamicCollection(string name,
         VectorStoreCollectionDefinition definition)
+#endif
     {
-        throw new NotImplementedException();
+        return new SingleStoreDynamicCollection(
+            _dataSource,
+            _dataSourceArc,
+            name,
+            new SingleStoreCollectionOptions
+            {
+                Definition = definition,
+                EmbeddingGenerator = _embeddingGenerator
+            }
+        );
     }
 
     /// <inheritdoc />
