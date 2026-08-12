@@ -15,6 +15,9 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     where TKey : notnull
     where TRecord : class
 {
+    /// <summary>Metadata about vector store record collection.</summary>
+    private readonly VectorStoreCollectionMetadata _collectionMetadata;
+
     /// <summary>Data source used to interact with the database.</summary>
     private readonly SingleStoreDataSource _dataSource;
 
@@ -108,6 +111,12 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
             _dataSource = dataSource;
             _dataSourceArc = dataSourceArc;
             _databaseName = new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).Database!;
+            _collectionMetadata = new VectorStoreCollectionMetadata
+            {
+                VectorStoreSystemName = SingleStoreConstants.VectorStoreSystemName,
+                VectorStoreName = _databaseName,
+                CollectionName = name
+            };
 
             // Don't add any lines after this - an exception thrown afterward would leave the reference count wrongly incremented.
             _dataSourceArc?.IncrementReferenceCount();
@@ -126,7 +135,14 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     /// <inheritdoc cref="VectorStoreCollection{TKey, TRecord}.GetService(Type, object?)" />
     public override object? GetService(Type serviceType, object? serviceKey = null)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(serviceType);
+
+        return
+            serviceKey is not null ? null :
+            serviceType == typeof(VectorStoreCollectionMetadata) ? _collectionMetadata :
+            serviceType == typeof(SingleStoreDataSource) ? _dataSource :
+            serviceType.IsInstanceOfType(this) ? this :
+            null;
     }
 
     /// <inheritdoc />
