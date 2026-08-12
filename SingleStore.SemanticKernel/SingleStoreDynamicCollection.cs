@@ -15,14 +15,19 @@ public sealed class SingleStoreDynamicCollection : SingleStoreCollection<object,
     /// <param name="name">The name of the collection.</param>
     /// <param name="ownsDataSource">
     /// A value indicating whether the data source should be disposed when the collection is
-    /// disposed.
+    /// disposed. Ownership transfers immediately, so <paramref name="dataSource" /> is also
+    /// disposed if this constructor throws.
     /// </param>
     /// <param name="options">Optional configuration options for this class.</param>
     public SingleStoreDynamicCollection(SingleStoreDataSource dataSource,
         string name,
         bool ownsDataSource,
         SingleStoreCollectionOptions options)
-        : this(dataSource, ownsDataSource ? new SingleStoreDataSourceArc(dataSource) : null, name, options)
+        : this(dataSource,
+            ownsDataSource ? new SingleStoreDataSourceArc(dataSource) : null,
+            ownsDataSource,
+            name,
+            options)
     {
     }
 
@@ -39,11 +44,13 @@ public sealed class SingleStoreDynamicCollection : SingleStoreCollection<object,
 
     internal SingleStoreDynamicCollection(SingleStoreDataSource dataSource,
         SingleStoreDataSourceArc? dataSourceArc,
+        bool ownsDataSource,
         string name,
         SingleStoreCollectionOptions options)
         : base(
             dataSource,
             dataSourceArc,
+            ownsDataSource,
             name,
             static options => new SingleStoreModelBuilder().BuildDynamic(
                 options.Definition ?? throw new ArgumentException("Definition is required for dynamic collections"),

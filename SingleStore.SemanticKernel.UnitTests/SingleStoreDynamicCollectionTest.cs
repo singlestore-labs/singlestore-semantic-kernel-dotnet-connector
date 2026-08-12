@@ -54,6 +54,31 @@ public class SingleStoreDynamicCollectionTest
     }
 
     [Fact]
+    public void WhenOwnsDataSourceAndConstructionFails_DisposesDataSource()
+    {
+        var dataSource = new SingleStoreDataSource(TestConnectionString);
+        var options = new SingleStoreCollectionOptions();
+
+        Assert.Throws<ArgumentException>(() =>
+            new SingleStoreDynamicCollection(dataSource, TestCollectionName, true, options));
+
+        Assert.ThrowsAny<ObjectDisposedException>(() => dataSource.CreateConnection());
+    }
+
+    [Fact]
+    public void WhenDoesNotOwnDataSourceAndConstructionFails_DoesNotDisposeDataSource()
+    {
+        using var dataSource = new SingleStoreDataSource(TestConnectionString);
+        var options = new SingleStoreCollectionOptions();
+
+        Assert.Throws<ArgumentException>(() =>
+            new SingleStoreDynamicCollection(dataSource, TestCollectionName, false, options));
+
+        using var connection = dataSource.CreateConnection();
+        Assert.NotNull(connection);
+    }
+
+    [Fact]
     public void CanConstructFromConnectionString()
     {
         using var collection = new SingleStoreDynamicCollection(

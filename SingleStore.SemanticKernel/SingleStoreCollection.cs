@@ -31,7 +31,8 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     /// <param name="name">The name of the collection.</param>
     /// <param name="ownsDataSource">
     /// A value indicating whether <paramref name="dataSource" /> is disposed when the collection
-    /// is disposed.
+    /// is disposed. Ownership transfers immediately, so <paramref name="dataSource" /> is also
+    /// disposed if this constructor throws.
     /// </param>
     /// <param name="options">Optional configuration options for this class.</param>
     [RequiresDynamicCode(
@@ -43,6 +44,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
         bool ownsDataSource,
         SingleStoreCollectionOptions? options = default) : this(dataSource,
         ownsDataSource ? new SingleStoreDataSourceArc(dataSource) : null,
+        ownsDataSource,
         name,
         options)
     {
@@ -54,11 +56,13 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
         "This constructor is incompatible with trimming. For dynamic mapping via Dictionary<string, object?>, instantiate SingleStoreDynamicCollection instead.")]
     internal SingleStoreCollection(SingleStoreDataSource dataSource,
         SingleStoreDataSourceArc? dataSourceArc,
+        bool ownsDataSource,
         string name,
         SingleStoreCollectionOptions? options)
         : this(
             dataSource,
             dataSourceArc,
+            ownsDataSource,
             name,
             static options => typeof(TRecord) == typeof(Dictionary<string, object?>)
                 ? throw new NotSupportedException(
@@ -89,24 +93,35 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
 
     internal SingleStoreCollection(SingleStoreDataSource dataSource,
         SingleStoreDataSourceArc? dataSourceArc,
+        bool ownsDataSource,
         string name,
         Func<SingleStoreCollectionOptions, CollectionModel> modelFactory,
         SingleStoreCollectionOptions? options)
     {
-        Verify.NotNullOrWhiteSpace(name);
         Verify.NotNull(dataSource);
 
-        options ??= SingleStoreCollectionOptions.Default;
+        try
+        {
+            Verify.NotNullOrWhiteSpace(name);
 
-        Name = name;
-        _model = modelFactory(options);
+            options ??= SingleStoreCollectionOptions.Default;
 
-        _dataSource = dataSource;
-        _dataSourceArc = dataSourceArc;
-        _databaseName = new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).Database!;
+            Name = name;
+            _model = modelFactory(options);
 
-        // Don't add any lines after this - an exception thrown afterward would leave the reference count wrongly incremented.
-        _dataSourceArc?.IncrementReferenceCount();
+            _dataSource = dataSource;
+            _dataSourceArc = dataSourceArc;
+            _databaseName = new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).Database!;
+
+            // Don't add any lines after this - an exception thrown afterward would leave the reference count wrongly incremented.
+            _dataSourceArc?.IncrementReferenceCount();
+        }
+        catch when (ownsDataSource)
+        {
+            // We own the data source, so nobody else will dispose it once construction fails.
+            dataSource.Dispose();
+            throw;
+        }
     }
 
     /// <inheritdoc />

@@ -25,7 +25,8 @@ public sealed class SingleStoreVectorStore : VectorStore
     /// <param name="dataSource">SingleStore data source.</param>
     /// <param name="ownsDataSource">
     /// A value indicating whether <paramref name="dataSource" /> is disposed when this instance
-    /// of <see cref="SingleStoreVectorStore" /> is disposed.
+    /// of <see cref="SingleStoreVectorStore" /> is disposed. Ownership transfers immediately, so
+    /// <paramref name="dataSource" /> is also disposed if this constructor throws.
     /// </param>
     /// <param name="options">Optional configuration options for this class</param>
     public SingleStoreVectorStore(SingleStoreDataSource dataSource,
@@ -34,13 +35,22 @@ public sealed class SingleStoreVectorStore : VectorStore
     {
         Verify.NotNull(dataSource);
 
-        _embeddingGenerator = options?.EmbeddingGenerator;
-        _dataSource = dataSource;
-        _dataSourceArc = ownsDataSource ? new SingleStoreDataSourceArc(dataSource) : null;
-        _databaseName = new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).Database!;
+        try
+        {
+            _embeddingGenerator = options?.EmbeddingGenerator;
+            _dataSource = dataSource;
+            _dataSourceArc = ownsDataSource ? new SingleStoreDataSourceArc(dataSource) : null;
+            _databaseName = new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).Database!;
 
-        // Don't add any lines after this - an exception thrown afterward would leave the reference count wrongly incremented.
-        _dataSourceArc?.IncrementReferenceCount();
+            // Don't add any lines after this - an exception thrown afterward would leave the reference count wrongly incremented.
+            _dataSourceArc?.IncrementReferenceCount();
+        }
+        catch when (ownsDataSource)
+        {
+            // We own the data source, so nobody else will dispose it once construction fails.
+            dataSource.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -74,6 +84,7 @@ public sealed class SingleStoreVectorStore : VectorStore
         return new SingleStoreCollection<TKey, TRecord>(
             _dataSource,
             _dataSourceArc,
+            ownsDataSource: false,
             name,
             new SingleStoreCollectionOptions
             {
@@ -94,6 +105,7 @@ public sealed class SingleStoreVectorStore : VectorStore
         return new SingleStoreDynamicCollection(
             _dataSource,
             _dataSourceArc,
+            ownsDataSource: false,
             name,
             new SingleStoreCollectionOptions
             {
