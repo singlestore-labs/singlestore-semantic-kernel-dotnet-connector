@@ -41,8 +41,10 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
             && type != typeof(long) // BIGINT
             && type != typeof(string) // LONGTEXT
             && type != typeof(Guid)) // BINARY(16)
+        {
             throw new NotSupportedException(
                 $"Property '{keyProperty.ModelName}' has unsupported type '{type.Name}'. Key properties must be one of the supported types: short, int, long, string, Guid");
+        }
     }
 
     /// <inheritdoc />
@@ -51,7 +53,10 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
         supportedTypes =
             "bool, byte, sbyte, short, ushort, int, uint, long, ulong, float, double, decimal, string, byte[], DateTime, DateTimeOffset, DateOnly, TimeOnly, Guid, string[], List<string>";
 
-        if (Nullable.GetUnderlyingType(type) is Type underlyingType) type = underlyingType;
+        if (Nullable.GetUnderlyingType(type) is Type underlyingType)
+        {
+            type = underlyingType;
+        }
 
         return type == typeof(bool) || // TINYINT
                type == typeof(byte) || // TINYINT UNSIGNED

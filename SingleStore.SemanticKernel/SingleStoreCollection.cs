@@ -11,8 +11,9 @@ namespace SingleStore.SemanticKernel;
 /// </summary>
 /// <typeparam name="TKey">The type of the key.</typeparam>
 /// <typeparam name="TRecord">The type of the record.</typeparam>
-public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, TRecord>,
-    IKeywordHybridSearchable<TRecord> where TKey : notnull where TRecord : class
+public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, TRecord>, IKeywordHybridSearchable<TRecord>
+    where TKey : notnull
+    where TRecord : class
 {
     /// <summary>Data source used to interact with the database.</summary>
     private readonly SingleStoreDataSource _dataSource;
@@ -29,11 +30,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     /// </summary>
     /// <param name="dataSource">The data source to use for connecting to the database.</param>
     /// <param name="name">The name of the collection.</param>
-    /// <param name="ownsDataSource">
-    /// A value indicating whether <paramref name="dataSource" /> is disposed when the collection
-    /// is disposed. Ownership transfers immediately, so <paramref name="dataSource" /> is also
-    /// disposed if this constructor throws.
-    /// </param>
+    /// <param name="ownsDataSource">A value indicating whether <paramref name="dataSource" /> is disposed when the collection is disposed. Ownership transfers immediately, so <paramref name="dataSource" /> is also disposed if this constructor throws.</param>
     /// <param name="options">Optional configuration options for this class.</param>
     [RequiresDynamicCode(
         "This constructor is incompatible with NativeAOT. For dynamic mapping via Dictionary<string, object?>, instantiate SingleStoreDynamicCollection instead.")]
@@ -59,8 +56,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
         bool ownsDataSource,
         string name,
         SingleStoreCollectionOptions? options)
-        : this(
-            dataSource,
+        : this(dataSource,
             dataSourceArc,
             ownsDataSource,
             name,
