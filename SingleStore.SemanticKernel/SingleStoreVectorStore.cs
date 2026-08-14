@@ -11,8 +11,12 @@ namespace SingleStore.SemanticKernel;
 /// </summary>
 public sealed class SingleStoreVectorStore : VectorStore
 {
+    /// <summary>A general purpose definition that can be used to construct a collection when needing to proxy schema agnostic operations.</summary>
+    private static readonly VectorStoreCollectionDefinition GeneralPurposeDefinition = new() { Properties = [new VectorStoreKeyProperty("Key", typeof(string))] };
+
     /// <summary>Data source used to interact with the database.</summary>
     private readonly SingleStoreDataSource _dataSource;
+
 
     private readonly SingleStoreDataSourceArc? _dataSourceArc;
     private readonly string _databaseName;
@@ -124,21 +128,38 @@ public sealed class SingleStoreVectorStore : VectorStore
     }
 
     /// <inheritdoc />
-    public override IAsyncEnumerable<string> ListCollectionNamesAsync(CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<string> ListCollectionNamesAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = SingleStoreSqlBuilder.ShowTables(connection, _databaseName);
+
+        using var reader = await connection.ExecuteWithErrorHandlingAsync(
+            _metadata,
+            "ListCollectionNames",
+            () => command.ExecuteReaderAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadWithErrorHandlingAsync(
+                   _metadata,
+                   "ListCollectionNames",
+                   cancellationToken).ConfigureAwait(false))
+        {
+            yield return reader.GetString(0);
+        }
     }
 
     /// <inheritdoc />
     public override Task<bool> CollectionExistsAsync(string name, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var collection = GetDynamicCollection(name, GeneralPurposeDefinition);
+        return collection.CollectionExistsAsync(cancellationToken);
     }
 
     /// <inheritdoc />
     public override Task EnsureCollectionDeletedAsync(string name, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var collection = GetDynamicCollection(name, GeneralPurposeDefinition);
+        return collection.EnsureCollectionDeletedAsync(cancellationToken);
     }
 
     /// <inheritdoc />
