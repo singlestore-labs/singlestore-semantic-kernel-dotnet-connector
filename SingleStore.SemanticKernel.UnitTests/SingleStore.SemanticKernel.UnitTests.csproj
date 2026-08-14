@@ -9,6 +9,7 @@
         <ImplicitUsings>disable</ImplicitUsings>
         <IsPackable>false</IsPackable>
         <LangVersion>latest</LangVersion>
+        <NoWarn>$(NoWarn);MEVD9001</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
