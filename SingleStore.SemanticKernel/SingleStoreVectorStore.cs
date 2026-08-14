@@ -19,6 +19,9 @@ public sealed class SingleStoreVectorStore : VectorStore
 
     private readonly IEmbeddingGenerator? _embeddingGenerator;
 
+    /// <summary>Metadata about vector store.</summary>
+    private readonly VectorStoreMetadata _metadata;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="SingleStoreVectorStore" /> class.
     /// </summary>
@@ -41,6 +44,11 @@ public sealed class SingleStoreVectorStore : VectorStore
             _dataSource = dataSource;
             _dataSourceArc = ownsDataSource ? new SingleStoreDataSourceArc(dataSource) : null;
             _databaseName = new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).Database!;
+            _metadata = new VectorStoreMetadata
+            {
+                VectorStoreSystemName = SingleStoreConstants.VectorStoreSystemName,
+                VectorStoreName = _databaseName
+            };
 
             // Don't add any lines after this - an exception thrown afterward would leave the reference count wrongly incremented.
             _dataSourceArc?.IncrementReferenceCount();
@@ -84,7 +92,7 @@ public sealed class SingleStoreVectorStore : VectorStore
         return new SingleStoreCollection<TKey, TRecord>(
             _dataSource,
             _dataSourceArc,
-            ownsDataSource: false,
+            false,
             name,
             new SingleStoreCollectionOptions
             {
@@ -105,7 +113,7 @@ public sealed class SingleStoreVectorStore : VectorStore
         return new SingleStoreDynamicCollection(
             _dataSource,
             _dataSourceArc,
-            ownsDataSource: false,
+            false,
             name,
             new SingleStoreCollectionOptions
             {
@@ -136,7 +144,14 @@ public sealed class SingleStoreVectorStore : VectorStore
     /// <inheritdoc />
     public override object? GetService(Type serviceType, object? serviceKey = null)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(serviceType);
+
+        return
+            serviceKey is not null ? null :
+            serviceType == typeof(VectorStoreMetadata) ? _metadata :
+            serviceType == typeof(SingleStoreDataSource) ? _dataSource :
+            serviceType.IsInstanceOfType(this) ? this :
+            null;
     }
 
     /// <inheritdoc />
