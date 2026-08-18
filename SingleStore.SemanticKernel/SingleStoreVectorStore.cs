@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 using Microsoft.Extensions.VectorData.ProviderServices;
@@ -128,7 +129,8 @@ public sealed class SingleStoreVectorStore : VectorStore
     }
 
     /// <inheritdoc />
-    public override async IAsyncEnumerable<string> ListCollectionNamesAsync(CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<string> ListCollectionNamesAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = SingleStoreSqlBuilder.ShowTables(connection, _databaseName);
