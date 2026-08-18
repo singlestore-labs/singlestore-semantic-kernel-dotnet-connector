@@ -149,17 +149,17 @@ public sealed class SingleStoreVectorStore : VectorStore
     }
 
     /// <inheritdoc />
-    public override Task<bool> CollectionExistsAsync(string name, CancellationToken cancellationToken = default)
+    public override async Task<bool> CollectionExistsAsync(string name, CancellationToken cancellationToken = default)
     {
-        var collection = GetDynamicCollection(name, GeneralPurposeDefinition);
-        return collection.CollectionExistsAsync(cancellationToken);
+        using var collection = GetDynamicCollection(name, GeneralPurposeDefinition);
+        return await collection.CollectionExistsAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public override Task EnsureCollectionDeletedAsync(string name, CancellationToken cancellationToken = default)
+    public override async Task EnsureCollectionDeletedAsync(string name, CancellationToken cancellationToken = default)
     {
-        var collection = GetDynamicCollection(name, GeneralPurposeDefinition);
-        return collection.EnsureCollectionDeletedAsync(cancellationToken);
+        using var collection = GetDynamicCollection(name, GeneralPurposeDefinition);
+        await collection.EnsureCollectionDeletedAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
