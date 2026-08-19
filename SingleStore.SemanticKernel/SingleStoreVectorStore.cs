@@ -13,11 +13,10 @@ namespace SingleStore.SemanticKernel;
 public sealed class SingleStoreVectorStore : VectorStore
 {
     /// <summary>A general purpose definition that can be used to construct a collection when needing to proxy schema agnostic operations.</summary>
-    private static readonly VectorStoreCollectionDefinition GeneralPurposeDefinition = new() { Properties = [new VectorStoreKeyProperty("Key", typeof(string))] };
+    private static readonly VectorStoreCollectionDefinition s_generalPurposeDefinition = new() { Properties = [new VectorStoreKeyProperty("Key", typeof(string))] };
 
     /// <summary>Data source used to interact with the database.</summary>
     private readonly SingleStoreDataSource _dataSource;
-
 
     private readonly SingleStoreDataSourceArc? _dataSourceArc;
     private readonly string _databaseName;
@@ -153,14 +152,14 @@ public sealed class SingleStoreVectorStore : VectorStore
     /// <inheritdoc />
     public override async Task<bool> CollectionExistsAsync(string name, CancellationToken cancellationToken = default)
     {
-        using var collection = GetDynamicCollection(name, GeneralPurposeDefinition);
+        using var collection = GetDynamicCollection(name, s_generalPurposeDefinition);
         return await collection.CollectionExistsAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public override async Task EnsureCollectionDeletedAsync(string name, CancellationToken cancellationToken = default)
     {
-        using var collection = GetDynamicCollection(name, GeneralPurposeDefinition);
+        using var collection = GetDynamicCollection(name, s_generalPurposeDefinition);
         await collection.EnsureCollectionDeletedAsync(cancellationToken).ConfigureAwait(false);
     }
 

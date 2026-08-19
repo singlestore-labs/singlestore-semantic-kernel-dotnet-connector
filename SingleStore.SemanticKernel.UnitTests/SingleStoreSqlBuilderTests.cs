@@ -53,7 +53,7 @@ public class SingleStoreSqlBuilderTests : IDisposable
             """
             CREATE TABLE IF NOT EXISTS `testdb`.`hotels`
             (
-            `HotelId` LONGTEXT NULL,
+              `HotelId` LONGTEXT NULL,
               `HotelName` LONGTEXT NULL,
               `HotelCode` INT NOT NULL,
               `HotelRating` FLOAT NULL,
