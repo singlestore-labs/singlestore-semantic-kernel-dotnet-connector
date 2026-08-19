@@ -156,21 +156,50 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     }
 
     /// <inheritdoc />
-    public override Task<bool> CollectionExistsAsync(CancellationToken cancellationToken = default)
+    public override async Task<bool> CollectionExistsAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = SingleStoreSqlBuilder.ShowTables(connection, _databaseName, Name);
+
+        return await connection.ExecuteWithErrorHandlingAsync(_collectionMetadata,
+            "CollectionExists",
+            async () =>
+            {
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                return await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public override Task EnsureCollectionExistsAsync(CancellationToken cancellationToken = default)
+    public override async Task EnsureCollectionExistsAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = SingleStoreSqlBuilder.CreateTable(connection,
+            _databaseName,
+            Name,
+            _model);
+
+        await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "EnsureCollectionExists",
+            () => command.ExecuteNonQueryAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public override Task EnsureCollectionDeletedAsync(CancellationToken cancellationToken = default)
+    public override async Task EnsureCollectionDeletedAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = SingleStoreSqlBuilder.DropTableIfExists(connection,
+            _databaseName,
+            Name);
+
+        await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "DeleteCollection",
+            () => command.ExecuteNonQueryAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

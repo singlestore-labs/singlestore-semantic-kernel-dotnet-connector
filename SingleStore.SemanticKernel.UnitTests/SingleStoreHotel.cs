@@ -14,14 +14,14 @@ public record SingleStoreHotel<T>
     public T HotelId { get; init; }
 
     /// <summary>A string metadata field.</summary>
-    [VectorStoreData]
+    [VectorStoreData(IsFullTextIndexed = true)]
     public string? HotelName { get; set; }
 
     /// <summary>An int metadata field.</summary>
-    [VectorStoreData]
+    [VectorStoreData(IsIndexed = true)]
     public int HotelCode { get; set; }
 
-    /// <summary>A  float metadata field.</summary>
+    /// <summary>A float metadata field.</summary>
     [VectorStoreData]
     public float? HotelRating { get; set; }
 
@@ -33,14 +33,16 @@ public record SingleStoreHotel<T>
     public List<string> Tags { get; set; } = [];
 
     /// <summary>A data field.</summary>
-    [VectorStoreData]
+    [VectorStoreData(IsFullTextIndexed = true)]
     public string Description { get; set; }
 
+    [VectorStoreData]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    [VectorStoreData]
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>A vector field.</summary>
-    [VectorStoreVector(4, DistanceFunction = DistanceFunction.ManhattanDistance, IndexKind = IndexKind.Hnsw)]
+    [VectorStoreVector(4, DistanceFunction = DistanceFunction.EuclideanDistance, IndexKind = IndexKind.Hnsw)]
     public ReadOnlyMemory<float>? DescriptionEmbedding { get; set; }
 }
