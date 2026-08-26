@@ -1,5 +1,8 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.IO.Pipelines;
 using System.Linq.Expressions;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 using Microsoft.Extensions.VectorData.ProviderServices;
 using SingleStoreConnector;
@@ -15,6 +18,9 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     where TKey : notnull
     where TRecord : class
 {
+    /// <summary>The default options for vector search.</summary>
+    private static readonly VectorSearchOptions<TRecord> s_defaultVectorSearchOptions = new();
+
     /// <summary>Metadata about vector store record collection.</summary>
     private readonly VectorStoreCollectionMetadata _collectionMetadata;
 
@@ -23,6 +29,9 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
 
     private readonly SingleStoreDataSourceArc? _dataSourceArc;
     private readonly string _databaseName;
+
+    /// <summary>A mapper to use for converting between the data model and the Azure AI Search record.</summary>
+    private readonly SingleStoreMapper<TRecord> _mapper;
 
     /// <summary>The model for this collection.</summary>
     private readonly CollectionModel _model;
@@ -107,6 +116,8 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
 
             Name = name;
             _model = modelFactory(options);
+            _mapper = new SingleStoreMapper<TRecord>(_model);
+
 
             _dataSource = dataSource;
             _dataSourceArc = dataSourceArc;
@@ -203,11 +214,33 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     }
 
     /// <inheritdoc />
-    public override Task<TRecord?> GetAsync(TKey key,
+    public override async Task<TRecord?> GetAsync(TKey key,
         RecordRetrievalOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(key);
+
+        var includeVectors = options?.IncludeVectors is true;
+        if (includeVectors && _model.EmbeddingGenerationRequired)
+        {
+            throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
+        }
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using var command = SingleStoreSqlBuilder.Select(connection, _databaseName, Name, _model, key, includeVectors);
+
+        return await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "Get",
+            async () =>
+            {
+                using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                return reader.HasRows
+                    ? _mapper.MapFromStorageToDataModel(reader, includeVectors)
+                    : null;
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -228,36 +261,168 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     }
 
     /// <inheritdoc />
-    public override Task DeleteAsync(TKey key, CancellationToken cancellationToken = default)
+    public override async Task DeleteAsync(TKey key, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(key);
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = SingleStoreSqlBuilder.Delete(
+            connection,
+            _databaseName,
+            Name,
+            _model.KeyProperty,
+            key);
+
+        await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "Delete",
+            () => command.ExecuteNonQueryAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public override Task DeleteAsync(IEnumerable<TKey> keys, CancellationToken cancellationToken = default)
+    public override async Task DeleteAsync(IEnumerable<TKey> keys, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(keys);
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = SingleStoreSqlBuilder.DeleteBatch(
+            connection,
+            _databaseName,
+            Name,
+            _model.KeyProperty,
+            keys);
+
+        await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "DeleteBatch",
+            () => command.ExecuteNonQueryAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public override Task UpsertAsync(TRecord record, CancellationToken cancellationToken = default)
+    public override async Task UpsertAsync(TRecord record, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        await UpsertAsync([record], cancellationToken);
     }
 
     /// <inheritdoc />
-    public override Task UpsertAsync(IEnumerable<TRecord> records, CancellationToken cancellationToken = default)
+    public override async Task UpsertAsync(IEnumerable<TRecord> records, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(records);
+        IReadOnlyList<TRecord>? recordsList = null;
+
+        // If an embedding generator is defined, invoke it once per property for all records.
+        Dictionary<VectorPropertyModel, IReadOnlyList<Embedding>>? generatedEmbeddings = null;
+
+        var vectorPropertyCount = _model.VectorProperties.Count;
+        for (var i = 0; i < vectorPropertyCount; i++)
+        {
+            var vectorProperty = _model.VectorProperties[i];
+
+            if (SingleStoreModelBuilder.IsVectorPropertyTypeValidCore(vectorProperty.Type, out _))
+            {
+                continue;
+            }
+
+            // We have a vector property whose type isn't natively supported - we need to generate embeddings.
+            Debug.Assert(vectorProperty.EmbeddingGenerator is not null);
+
+            // Materialize the records' enumerable if needed, to prevent multiple enumeration.
+            if (recordsList is null)
+            {
+                recordsList = records is IReadOnlyList<TRecord> r ? r : records.ToList();
+
+                if (recordsList.Count == 0)
+                {
+                    return;
+                }
+
+                records = recordsList;
+            }
+
+            // TODO: Ideally we'd group together vector properties using the same generator (and with the same input and output properties),
+            // and generate embeddings for them in a single batch. That's some more complexity though.
+            generatedEmbeddings ??= new Dictionary<VectorPropertyModel, IReadOnlyList<Embedding>>(vectorPropertyCount);
+            generatedEmbeddings[vectorProperty] = await vectorProperty.GenerateEmbeddingsAsync(records.Select(r => vectorProperty.GetValueAsObject(r)), cancellationToken).ConfigureAwait(false);
+        }
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+        var pipe = new Pipe();
+
+        var loader = new SingleStoreBulkLoader(connection)
+        {
+            SourceStream = pipe.Reader.AsStream(),
+            TableName = SingleStoreSqlBuilder.QuoteTable(_databaseName, Name),
+            Local = true,
+            CharacterSet = "utf8mb4",
+            FieldTerminator = "\t",
+            LineTerminator = "\n",
+            EscapeCharacter = '\\',
+            ConflictOption = SingleStoreBulkLoaderConflictOption.Replace
+        };
+        loader.Columns.AddRange(_model.Properties.Select(propery => SingleStoreSqlBuilder.Builder.QuoteIdentifier(propery.StorageName)).ToList());
+
+        await VectorStoreErrorHandler.RunOperationAsync<SingleStoreException>(
+            _collectionMetadata,
+            "Upsert",
+            async () =>
+            {
+                var writeTask = TsvWriter<TRecord>.WriteRecordsAsync(
+                    pipe.Writer,
+                    _model,
+                    records,
+                    generatedEmbeddings,
+                    cancellationToken);
+                var loadTask = loader.LoadAsync(cancellationToken);
+
+                await Task.WhenAll(writeTask, loadTask).ConfigureAwait(false);
+            });
     }
 
     /// <inheritdoc />
-    public override IAsyncEnumerable<VectorSearchResult<TRecord>> SearchAsync<TInput>(TInput searchValue,
+    public override async IAsyncEnumerable<VectorSearchResult<TRecord>> SearchAsync<TInput>(TInput searchValue,
         int top,
         VectorSearchOptions<TRecord>? options = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(searchValue);
+        Verify.NotLessThan(top, 1);
+
+        options ??= s_defaultVectorSearchOptions;
+        if (options.IncludeVectors && _model.EmbeddingGenerationRequired)
+        {
+            throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
+        }
+
+        var vectorProperty = _model.GetVectorPropertyOrSingle(options);
+
+        using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using var command = SingleStoreSqlBuilder.SelectVectorSearch(connection,
+            _databaseName,
+            Name,
+            _model,
+            vectorProperty,
+            searchValue,
+            options.Filter,
+            options.Skip,
+            options.IncludeVectors,
+            top,
+            options.ScoreThreshold);
+
+        using var reader = await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "Search",
+            () => command.ExecuteReaderAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadWithErrorHandlingAsync(_collectionMetadata, "Search", cancellationToken).ConfigureAwait(false))
+        {
+            yield return new VectorSearchResult<TRecord>(
+                _mapper.MapFromStorageToDataModel(reader, options.IncludeVectors),
+                reader.GetDouble(reader.GetOrdinal(SingleStoreConstants.DistanceColumnName)));
+        }
     }
 
     /// <inheritdoc />

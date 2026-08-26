@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 using Microsoft.Extensions.VectorData.ProviderServices;
@@ -10,11 +11,134 @@ namespace SingleStore.SemanticKernel;
 /// </summary>
 internal static class SingleStoreSqlBuilder
 {
-    private static readonly SingleStoreCommandBuilder Builder = new();
+    public static readonly SingleStoreCommandBuilder Builder = new();
 
     private static string EscapeStringForLike(string value)
     {
         return value.Replace("%", "\\%").Replace("_", "\\_");
+    }
+
+    private static (string Condition, List<SingleStoreParameter> Parameters) MapFilterConditionToSql(CollectionModel model, LambdaExpression? filter)
+    {
+        if (filter is null)
+        {
+            return (string.Empty, Parameters: new List<SingleStoreParameter>());
+        }
+
+        SingleStoreFilterTranslator translator = new(model, filter, 0);
+        translator.Translate(true);
+        return (translator.Clause.ToString(), translator.Parameters);
+    }
+
+
+    internal static SingleStoreCommand Select<TKey>(SingleStoreConnection connection,
+        string database,
+        string table,
+        CollectionModel model,
+        TKey key,
+        bool includeVectors)
+    {
+        var command = connection.CreateCommand();
+
+        var columns = string.Join(", ",
+            model.Properties
+                .Where(p => includeVectors || !(p is VectorPropertyModel))
+                .Select(p => Builder.QuoteIdentifier(p.StorageName)).ToList());
+        var quotedTable = QuoteTable(database, table);
+        var quotedKeyColumn = Builder.QuoteIdentifier(model.KeyProperty.StorageName);
+        command.CommandText = $"SELECT {columns} FROM {quotedTable} WHERE {quotedKeyColumn} = @key";
+        command.Parameters.AddWithValue("@key", key);
+
+        return command;
+    }
+
+    internal static SingleStoreCommand SelectVectorSearch<TRecord>(SingleStoreConnection connection,
+        string database,
+        string table,
+        CollectionModel model,
+        VectorPropertyModel property,
+        object vectorValue,
+        Expression<Func<TRecord, bool>>? filter,
+        int? skip,
+        bool includeVectors,
+        int top,
+        double? scoreThreshold = null)
+    {
+        var command = connection.CreateCommand();
+
+        var columns = string.Join(", ",
+            model.Properties
+                .Where(p => includeVectors || !(p is VectorPropertyModel))
+                .Select(p => Builder.QuoteIdentifier(p.StorageName)).ToList());
+        var quotedVectorColumn = Builder.QuoteIdentifier(property.StorageName);
+        var vectorOperator = property.DistanceFunction switch
+        {
+            DistanceFunction.EuclideanDistance => "<->",
+            DistanceFunction.DotProductSimilarity => "<*>",
+            _ => throw new NotSupportedException($"Distance function {property.DistanceFunction} is not supported by this store.")
+        };
+        var (whereClause, whereClauseParameters) = MapFilterConditionToSql(model, filter);
+        var quotedTableName = QuoteTable(database, table);
+        var order = property.DistanceFunction switch
+        {
+            DistanceFunction.EuclideanDistance => "ASC",
+            DistanceFunction.DotProductSimilarity => "DESC",
+            _ => throw new NotSupportedException($"Distance function {property.DistanceFunction} is not supported by this store.")
+        };
+        var limitClause = skip is null ? $"LIMIT {top}" : $"LIMIT {top} OFFSET {skip}";
+
+        command.CommandText = $"SELECT {columns}, {quotedVectorColumn} {vectorOperator} @vector AS {SingleStoreConstants.DistanceColumnName}\n" +
+                              $"FROM {quotedTableName}\n" +
+                              $"{whereClause}\n" +
+                              $"ORDER BY {SingleStoreConstants.DistanceColumnName} {order}\n" +
+                              $"{limitClause}";
+        command.Parameters.Add(new SingleStoreParameter("@vector", vectorValue));
+        // TODO: handle scoreThreshold
+
+        foreach (var parameter in whereClauseParameters)
+        {
+            command.Parameters.Add(parameter);
+        }
+
+        return command;
+    }
+
+    internal static SingleStoreCommand Delete<TKey>(SingleStoreConnection connection,
+        string database,
+        string table,
+        KeyPropertyModel property,
+        TKey key)
+    {
+        var command = connection.CreateCommand();
+
+        var quotedTable = QuoteTable(database, table);
+        var quotedKeyColumn = Builder.QuoteIdentifier(property.StorageName);
+        command.CommandText = $"DELETE FROM {quotedTable} WHERE {quotedKeyColumn} = @key";
+        command.Parameters.AddWithValue("@key", key);
+
+        return command;
+    }
+
+    internal static SingleStoreCommand DeleteBatch<TKey>(SingleStoreConnection connection,
+        string database,
+        string table,
+        KeyPropertyModel property,
+        IEnumerable<TKey> keys)
+    {
+        var command = connection.CreateCommand();
+
+        var counter = 0;
+        foreach (var key in keys)
+        {
+            var parameterName = $"@key{counter++}";
+            command.Parameters.AddWithValue(parameterName, key);
+        }
+
+        var quotedTable = QuoteTable(database, table);
+        var quotedKeyColumn = Builder.QuoteIdentifier(property.StorageName);
+        command.CommandText = $"DELETE FROM {quotedTable} WHERE {quotedKeyColumn} IN ({string.Join(", ", command.Parameters.Select(parameter => parameter.ParameterName))})";
+
+        return command;
     }
 
     internal static SingleStoreCommand ShowTables(SingleStoreConnection connection, string database, string? table = null)
@@ -41,7 +165,7 @@ internal static class SingleStoreSqlBuilder
         return command;
     }
 
-    private static string QuoteTable(string database, string table)
+    internal static string QuoteTable(string database, string table)
     {
         var quotedDatabase = Builder.QuoteIdentifier(database);
         var quotedTable = Builder.QuoteIdentifier(table);
@@ -54,7 +178,7 @@ internal static class SingleStoreSqlBuilder
         var command = connection.CreateCommand();
         var columns = new List<string>
         {
-            MapKeyColumnToSql(model.KeyProperty)
+            MapColumnToSql(model.KeyProperty)
         };
         var keys = new List<string>
         {
@@ -160,14 +284,6 @@ internal static class SingleStoreSqlBuilder
         return $"{quotedColumnName} {type}{nullability}";
     }
 
-    private static string MapKeyColumnToSql(KeyPropertyModel property)
-    {
-        var columnDef = MapColumnToSql(property);
-        var autoIncrement = property.IsAutoGenerated ? " AUTO_INCREMENT" : "";
-
-        return $"{columnDef}{autoIncrement}";
-    }
-
     private static string MapColumnToSql(PropertyModel property)
     {
         var quotedColumnName = Builder.QuoteIdentifier(property.StorageName);
@@ -239,7 +355,7 @@ internal static class SingleStoreSqlBuilder
             not null when t == typeof(TimeOnly) => "TIME(6)",
 #endif
             // TODO: SingleStore does not have a dedicated GUID type. Verify that GUID values are written and read correctly.
-            not null when t == typeof(Guid) => "BINARY(16)",
+            not null when t == typeof(Guid) => "CHAR(36)",
             not null when t == typeof(string[]) || t == typeof(List<string>) => "JSON",
             _ => throw new NotSupportedException($"Type {property.Type} is not supported.")
         };

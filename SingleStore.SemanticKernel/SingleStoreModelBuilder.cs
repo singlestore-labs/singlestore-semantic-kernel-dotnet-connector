@@ -26,7 +26,7 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
     /// <inheritdoc />
     protected override bool SupportsKeyAutoGeneration(Type keyPropertyType)
     {
-        return keyPropertyType == typeof(long);
+        return keyPropertyType == typeof(Guid);
     }
 
     /// <inheritdoc />
@@ -86,6 +86,11 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
 
     /// <inheritdoc />
     protected override bool IsVectorPropertyTypeValid(Type type, [NotNullWhen(false)] out string? supportedTypes)
+    {
+        return IsVectorPropertyTypeValidCore(type, out supportedTypes);
+    }
+
+    internal static bool IsVectorPropertyTypeValidCore(Type type, [NotNullWhen(false)] out string? supportedTypes)
     {
         supportedTypes = "ReadOnlyMemory<sbyte>, Embedding<sbyte>, sbyte[], " +
                          "ReadOnlyMemory<short>, Embedding<short>, short[], " +
