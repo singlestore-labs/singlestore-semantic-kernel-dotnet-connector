@@ -38,14 +38,5 @@ public class SingleStoreDataTypeTests(SingleStoreDataTypeTests.Fixture fixture)
     public new class Fixture : DataTypeTests<Guid, DefaultRecord>.Fixture
     {
         public override TestStore TestStore => SingleStoreTestStore.Instance;
-
-        public override IList<VectorStoreDataProperty> GetDataProperties()
-        {
-            var properties = base.GetDataProperties();
-            properties
-                .Single(p => p.Type == typeof(string[]))
-                .IsIndexed = false;
-            return properties;
-        }
     }
 }

@@ -191,7 +191,14 @@ internal static class SingleStoreSqlBuilder
             columns.Add(MapColumnToSql(dataProperty));
             if (dataProperty.IsIndexed)
             {
-                keys.Add(MapKeyToSql("INDEX", dataProperty));
+                if (dataProperty.Type == typeof(string[]) || dataProperty.Type == typeof(List<string>))
+                {
+                    keys.Add(MapJsonKeyToSql(dataProperty));
+                }
+                else
+                {
+                    keys.Add(MapKeyToSql("INDEX", dataProperty));
+                }
             }
 
             if (dataProperty.IsFullTextIndexed)
@@ -262,6 +269,11 @@ internal static class SingleStoreSqlBuilder
             IndexKind.Hnsw => "HNSW_FLAT",
             _ => throw new NotSupportedException($"Index kind {indexKind} is not supported by this store.")
         };
+    }
+
+    private static string MapJsonKeyToSql(PropertyModel property)
+    {
+        return $"{MapKeyToSql("MULTI VALUE INDEX", property)} INDEX_OPTIONS='{{\"TOKENIZER\":\"MATCH_ANY\", \"PATH\":[]}}'";
     }
 
     private static string MapKeyToSql(string keyType, params PropertyModel[] properties)
