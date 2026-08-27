@@ -12,6 +12,13 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
         SupportsMultipleVectors = true
     };
 
+    internal static readonly string SupportedVectorTypes = "ReadOnlyMemory<sbyte>, Embedding<sbyte>, sbyte[], " +
+                                                           "ReadOnlyMemory<short>, Embedding<short>, short[], " +
+                                                           "ReadOnlyMemory<int>, Embedding<int>, int[], " +
+                                                           "ReadOnlyMemory<long>, Embedding<long>, long[], " +
+                                                           "ReadOnlyMemory<float>, Embedding<float>, float[], " +
+                                                           "ReadOnlyMemory<double>, Embedding<double>, double[]";
+
     /// <inheritdoc />
     protected override IReadOnlyList<EmbeddingGenerationDispatcher> EmbeddingGenerationDispatchers { get; } =
     [
@@ -92,12 +99,7 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
 
     internal static bool IsVectorPropertyTypeValidCore(Type type, [NotNullWhen(false)] out string? supportedTypes)
     {
-        supportedTypes = "ReadOnlyMemory<sbyte>, Embedding<sbyte>, sbyte[], " +
-                         "ReadOnlyMemory<short>, Embedding<short>, short[], " +
-                         "ReadOnlyMemory<int>, Embedding<int>, int[], " +
-                         "ReadOnlyMemory<long>, Embedding<long>, long[], " +
-                         "ReadOnlyMemory<float>, Embedding<float>, float[], " +
-                         "ReadOnlyMemory<double>, Embedding<double>, double[]";
+        supportedTypes = SupportedVectorTypes;
 
         if (Nullable.GetUnderlyingType(type) is Type underlyingType) type = underlyingType;
 

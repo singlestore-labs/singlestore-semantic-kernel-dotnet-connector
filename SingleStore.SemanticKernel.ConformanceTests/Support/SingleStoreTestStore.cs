@@ -27,7 +27,7 @@ public class SingleStoreTestStore : TestStore
     {
     }
 
-    public override string DefaultDistanceFunction => DistanceFunction.DotProductSimilarity;
+    public override string DefaultDistanceFunction => DistanceFunction.EuclideanDistance;
 
 
     public SingleStoreDataSource DataSource => _dataSource ?? throw new InvalidOperationException("Not initialized");

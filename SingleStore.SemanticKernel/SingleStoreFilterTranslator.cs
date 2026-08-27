@@ -80,11 +80,11 @@ internal sealed class SingleStoreFilterTranslator : SqlFilterTranslator
             throw new NotSupportedException("Unsupported Contains expression");
         }
 
-        _sql.Append("JSON_ARRAY_CONTAINS_STRING(");
-        Translate(source);
-        _sql.Append(", ");
+        _sql.Append("JSON_MATCH_ANY(MATCH_PARAM_JSON() = TO_JSON(");
         Translate(item);
-        _sql.Append(") = 1");
+        _sql.Append("), ");
+        Translate(source);
+        _sql.Append(")");
     }
 
     protected override void TranslateContainsOverParameterizedArray(Expression source, Expression item, object? value)
@@ -118,15 +118,13 @@ internal sealed class SingleStoreFilterTranslator : SqlFilterTranslator
     protected override void TranslateAnyContainsOverArrayColumn(PropertyModel property, object? values)
     {
         // Translate r.Strings.Any(s => array.Contains(s)) to:
-        // EXISTS(SELECT 1 FROM TABLE(JSON_TO_ARRAY(column)) WHERE value IN ('a', 'b', 'c'))
+        // JSON_MATCH_ANY(MATCH_PARAM_JSON() IN (TO_JSON('a'), TO_JSON('b')), column)
         if (values is not IEnumerable elements)
         {
             throw new NotSupportedException("Unsupported Any expression");
         }
 
-        _sql.Append("EXISTS(SELECT 1 FROM TABLE(JSON_TO_ARRAY(");
-        GenerateColumn(property);
-        _sql.Append(")) WHERE value IN (");
+        _sql.Append("JSON_MATCH_ANY(MATCH_PARAM_JSON() IN (");
 
         var isFirst = true;
         foreach (var element in elements)
@@ -140,10 +138,14 @@ internal sealed class SingleStoreFilterTranslator : SqlFilterTranslator
                 _sql.Append(", ");
             }
 
+            _sql.Append("TO_JSON(");
             TranslateConstant(element, false);
+            _sql.Append(")");
         }
 
-        _sql.Append("))");
+        _sql.Append("), ");
+        GenerateColumn(property);
+        _sql.Append(")");
     }
 
 

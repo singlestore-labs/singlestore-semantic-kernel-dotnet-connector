@@ -15,12 +15,12 @@ internal static class TsvWriter<TRecord>
         Dictionary<VectorPropertyModel, IReadOnlyList<Embedding>>? generatedEmbeddings,
         CancellationToken cancellationToken)
     {
-        // TODO: handle key generations
         Exception? error = null;
         try
         {
             using var stream = pipeWriter.AsStream(true);
             using var writer = new StreamWriter(stream, new UTF8Encoding(false), 1024, true);
+            var recordIndex = 0;
             foreach (var record in records)
             {
                 for (var i = 0; i < model.Properties.Count; i++)
@@ -30,11 +30,24 @@ internal static class TsvWriter<TRecord>
                     var value = model.Properties[i].GetValueAsObject(record);
                     if (model.Properties[i] is VectorPropertyModel vectorProperty)
                     {
-                        if (generatedEmbeddings != null && generatedEmbeddings.ContainsKey(vectorProperty))
+                        if (generatedEmbeddings?.TryGetValue(vectorProperty, out var ge) is true)
                         {
-                            await writer.WriteAsync(EscapeTsv(JsonSerializer.Serialize(generatedEmbeddings[vectorProperty]))).ConfigureAwait(false);
+                            value = ge[recordIndex];
                         }
-                        else if (value is null)
+
+                        value = value switch
+                        {
+                            null => null,
+                            Embedding<float> e => e.Vector,
+                            Embedding<double> e => e.Vector,
+                            Embedding<sbyte> e => e.Vector,
+                            Embedding<short> e => e.Vector,
+                            Embedding<int> e => e.Vector,
+                            Embedding<long> e => e.Vector,
+                            _ => value
+                        };
+
+                        if (value is null)
                         {
                             await writer.WriteAsync("\\N").ConfigureAwait(false);
                         }
@@ -92,6 +105,8 @@ internal static class TsvWriter<TRecord>
                     var token = i + 1 == model.Properties.Count ? "\n" : "\t";
                     await writer.WriteAsync(token).ConfigureAwait(false);
                 }
+
+                recordIndex++;
             }
 
             await writer.FlushAsync().ConfigureAwait(false);

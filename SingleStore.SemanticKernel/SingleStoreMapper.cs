@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData.ProviderServices;
 using SingleStoreConnector;
 
@@ -30,22 +31,22 @@ internal sealed class SingleStoreMapper<TRecord>(CollectionModel model)
                 var elementType = Nullable.GetUnderlyingType(property.EmbeddingType) ?? property.EmbeddingType;
                 switch (Nullable.GetUnderlyingType(elementType) ?? elementType)
                 {
-                    case var t when t == typeof(sbyte):
+                    case var t when t == typeof(ReadOnlyMemory<sbyte>) || t == typeof(Embedding<sbyte>) || t == typeof(sbyte[]):
                         PopulateVectorValue<sbyte>(reader, property, record);
                         break;
-                    case var t when t == typeof(short):
+                    case var t when t == typeof(ReadOnlyMemory<short>) || t == typeof(Embedding<short>) || t == typeof(short[]):
                         PopulateVectorValue<short>(reader, property, record);
                         break;
-                    case var t when t == typeof(int):
+                    case var t when t == typeof(ReadOnlyMemory<int>) || t == typeof(Embedding<int>) || t == typeof(int[]):
                         PopulateVectorValue<int>(reader, property, record);
                         break;
-                    case var t when t == typeof(long):
+                    case var t when t == typeof(ReadOnlyMemory<long>) || t == typeof(Embedding<long>) || t == typeof(long[]):
                         PopulateVectorValue<long>(reader, property, record);
                         break;
-                    case var t when t == typeof(float):
+                    case var t when t == typeof(ReadOnlyMemory<float>) || t == typeof(Embedding<float>) || t == typeof(float[]):
                         PopulateVectorValue<float>(reader, property, record);
                         break;
-                    case var t when t == typeof(double):
+                    case var t when t == typeof(ReadOnlyMemory<double>) || t == typeof(Embedding<double>) || t == typeof(double[]):
                         PopulateVectorValue<double>(reader, property, record);
                         break;
                     default:
@@ -70,6 +71,7 @@ internal sealed class SingleStoreMapper<TRecord>(CollectionModel model)
                         property.Type switch
                         {
                             var t when t == typeof(ReadOnlyMemory<TElement>) => vector,
+                            var t when t == typeof(Embedding<TElement>) => new Embedding<TElement>(vector),
                             var t when t == typeof(TElement[])
                                 => MemoryMarshal.TryGetArray(vector, out var segment)
                                    && segment.Count == segment.Array!.Length
