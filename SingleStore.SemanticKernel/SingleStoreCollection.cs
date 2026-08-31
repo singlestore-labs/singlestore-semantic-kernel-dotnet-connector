@@ -21,6 +21,9 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     /// <summary>The default options for vector search.</summary>
     private static readonly VectorSearchOptions<TRecord> s_defaultVectorSearchOptions = new();
 
+    /// <summary>The default options for hybrid search.</summary>
+    private static readonly HybridSearchOptions<TRecord> s_defaultHybridSearchOptions = new();
+
     /// <summary>Metadata about vector store record collection.</summary>
     private readonly VectorStoreCollectionMetadata _collectionMetadata;
 
@@ -157,13 +160,82 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     }
 
     /// <inheritdoc />
-    public IAsyncEnumerable<VectorSearchResult<TRecord>> HybridSearchAsync<TInput>(TInput searchValue,
+    public async IAsyncEnumerable<VectorSearchResult<TRecord>> HybridSearchAsync<TInput>(TInput searchValue,
         ICollection<string> keywords,
         int top,
         HybridSearchOptions<TRecord>? options = null,
         CancellationToken cancellationToken = default) where TInput : notnull
     {
-        throw new NotImplementedException();
+        Verify.NotNull(searchValue);
+        Verify.NotNull(keywords);
+        Verify.NotLessThan(top, 1);
+
+        options ??= s_defaultHybridSearchOptions;
+        if (options.IncludeVectors && _model.EmbeddingGenerationRequired)
+        {
+            throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
+        }
+
+        var vectorProperty = _model.GetVectorPropertyOrSingle(new VectorSearchOptions<TRecord> { VectorProperty = options.VectorProperty });
+        var textProperty = _model.GetFullTextDataPropertyOrSingle(options.AdditionalProperty);
+        object vector = searchValue switch
+        {
+            ReadOnlyMemory<sbyte> or ReadOnlyMemory<short> or ReadOnlyMemory<int>
+                or ReadOnlyMemory<long> or ReadOnlyMemory<float> or ReadOnlyMemory<double> => searchValue,
+
+            sbyte[] or short[] or int[] or long[] or float[] or double[] => searchValue,
+
+            Embedding<sbyte> e => e.Vector,
+            Embedding<short> e => e.Vector,
+            Embedding<int> e => e.Vector,
+            Embedding<long> e => e.Vector,
+            Embedding<float> e => e.Vector,
+            Embedding<double> e => e.Vector,
+
+            _ when vectorProperty.EmbeddingGenerationDispatcher is not null
+                => await vectorProperty.GenerateEmbeddingAsync(searchValue, cancellationToken).ConfigureAwait(false) switch
+                {
+                    Embedding<sbyte> e => e.Vector,
+                    Embedding<short> e => e.Vector,
+                    Embedding<int> e => e.Vector,
+                    Embedding<long> e => e.Vector,
+                    Embedding<float> e => e.Vector,
+                    Embedding<double> e => e.Vector,
+                    _ => throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), SingleStoreModelBuilder.SupportedVectorTypes))
+                },
+
+            _ => vectorProperty.EmbeddingGenerator is null
+                ? throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), SingleStoreModelBuilder.SupportedVectorTypes))
+                : throw new InvalidOperationException(VectorDataStrings.IncompatibleEmbeddingGeneratorWasConfiguredForInputType(typeof(TInput), vectorProperty.EmbeddingGenerator.GetType()))
+        };
+
+        using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using var command = SingleStoreSqlBuilder.SelectHybridSearch(connection,
+            _databaseName,
+            Name,
+            _model,
+            vectorProperty,
+            textProperty,
+            vector,
+            keywords,
+            options.Filter,
+            options.Skip,
+            options.IncludeVectors,
+            top,
+            options.ScoreThreshold);
+
+        using var reader = await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "HybridSearch",
+            () => command.ExecuteReaderAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadWithErrorHandlingAsync(_collectionMetadata, "HybridSearch", cancellationToken).ConfigureAwait(false))
+        {
+            yield return new VectorSearchResult<TRecord>(
+                _mapper.MapFromStorageToDataModel(reader, options.IncludeVectors),
+                reader.GetDouble(reader.GetOrdinal(SingleStoreConstants.ScoreColumnName)));
+        }
     }
 
     /// <inheritdoc />
