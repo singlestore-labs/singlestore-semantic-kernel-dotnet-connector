@@ -163,18 +163,20 @@ internal static class SingleStoreSqlBuilder
         {
             var sign = property.DistanceFunction switch
             {
-                DistanceFunction.EuclideanDistance or DistanceFunction.EuclideanSquaredDistance => "<=",
-                DistanceFunction.DotProductSimilarity or DistanceFunction.NegativeDotProductSimilarity or null => ">=",
+                DistanceFunction.EuclideanDistance
+                    or DistanceFunction.EuclideanSquaredDistance
+                    or DistanceFunction.NegativeDotProductSimilarity => "<=",
+                DistanceFunction.DotProductSimilarity or null => ">=",
                 _ => throw new NotSupportedException($"Distance function {property.DistanceFunction} is not supported by this store.")
             };
 
             if (whereClause.Length == 0)
             {
-                whereClause = $"WHERE {SingleStoreConstants.DistanceColumnName} {sign} @scoreThreshold";
+                whereClause = $"WHERE {SingleStoreConstants.ScoreColumnName} {sign} @scoreThreshold";
             }
             else
             {
-                whereClause = $"({whereClause}) AND {SingleStoreConstants.DistanceColumnName} {sign} @scoreThreshold";
+                whereClause = $"({whereClause}) AND {SingleStoreConstants.ScoreColumnName} {sign} @scoreThreshold";
             }
 
             command.Parameters.Add(new SingleStoreParameter("@scoreThreshold", scoreThreshold.Value));
@@ -203,8 +205,7 @@ internal static class SingleStoreSqlBuilder
         VectorPropertyModel vectorProperty,
         DataPropertyModel textProperty,
         object vectorValue,
-        ICollection<string> 
-        ,
+        ICollection<string> keywords,
         Expression<Func<TRecord, bool>>? filter,
         int? skip,
         bool includeVectors,
@@ -246,18 +247,20 @@ internal static class SingleStoreSqlBuilder
         {
             var sign = vectorProperty.DistanceFunction switch
             {
-                DistanceFunction.EuclideanDistance or DistanceFunction.EuclideanSquaredDistance => "<=",
-                DistanceFunction.DotProductSimilarity or DistanceFunction.NegativeDotProductSimilarity or null => ">=",
+                DistanceFunction.EuclideanDistance
+                    or DistanceFunction.EuclideanSquaredDistance
+                    or DistanceFunction.NegativeDotProductSimilarity => "<=",
+                DistanceFunction.DotProductSimilarity or null => ">=",
                 _ => throw new NotSupportedException($"Distance function {vectorProperty.DistanceFunction} is not supported by this store.")
             };
 
             if (whereClause.Length == 0)
             {
-                whereClause = $"WHERE {SingleStoreConstants.DistanceColumnName} {sign} @scoreThreshold";
+                whereClause = $"WHERE {SingleStoreConstants.ScoreColumnName} {sign} @scoreThreshold";
             }
             else
             {
-                whereClause = $"({whereClause}) AND {SingleStoreConstants.DistanceColumnName} {sign} @scoreThreshold";
+                whereClause = $"({whereClause}) AND {SingleStoreConstants.ScoreColumnName} {sign} @scoreThreshold";
             }
 
             command.Parameters.Add(new SingleStoreParameter("@scoreThreshold", scoreThreshold.Value));

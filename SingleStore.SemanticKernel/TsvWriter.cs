@@ -28,79 +28,34 @@ internal static class TsvWriter<TRecord>
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var value = model.Properties[i].GetValueAsObject(record);
-                    if (model.Properties[i] is VectorPropertyModel vectorProperty)
+                    if (model.Properties[i] is VectorPropertyModel vectorProperty && generatedEmbeddings?.TryGetValue(vectorProperty, out var ge) is true)
                     {
-                        if (generatedEmbeddings?.TryGetValue(vectorProperty, out var ge) is true)
-                        {
-                            value = ge[recordIndex];
-                        }
+                        value = ge[recordIndex];
+                    }
 
-                        value = value switch
-                        {
-                            null => null,
-                            Embedding<float> e => e.Vector,
-                            Embedding<double> e => e.Vector,
-                            Embedding<sbyte> e => e.Vector,
-                            Embedding<short> e => e.Vector,
-                            Embedding<int> e => e.Vector,
-                            Embedding<long> e => e.Vector,
-                            _ => value
-                        };
-
-                        if (value is null)
-                        {
-                            await writer.WriteAsync("\\N").ConfigureAwait(false);
-                        }
-                        else
-                        {
-                            await writer.WriteAsync(EscapeTsv(JsonSerializer.Serialize(value))).ConfigureAwait(false);
-                        }
-                    }
-                    else if (value is null)
+                    var escapedValue = value switch
                     {
-                        await writer.WriteAsync("\\N").ConfigureAwait(false);
-                    }
-                    else if (value is bool boolValue)
-                    {
-                        await writer.WriteAsync(boolValue ? "1" : "0").ConfigureAwait(false);
-                    }
-                    else if (value is DateTime dateTimeValue)
-                    {
-                        await writer.WriteAsync(EscapeTsv(dateTimeValue.ToString("yyyy-MM-dd HH:mm:ss.ffffff"))).ConfigureAwait(false);
-                    }
-                    else if (value is DateTimeOffset dateTimeOffsetValue)
-                    {
-                        if (dateTimeOffsetValue.Offset != TimeSpan.Zero)
-                        {
-                            throw new ArgumentException(
-                                $"Cannot write DateTimeOffset with Offset={dateTimeOffsetValue.Offset}, only offset 0 (UTC) is supported.",
-                                nameof(value));
-                        }
-
-                        await writer.WriteAsync(EscapeTsv(dateTimeOffsetValue.ToString("yyyy-MM-dd HH:mm:ss.ffffff"))).ConfigureAwait(false);
-                    }
+                        Embedding<float> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
+                        Embedding<double> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
+                        Embedding<sbyte> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
+                        Embedding<short> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
+                        Embedding<int> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
+                        Embedding<long> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
+                        bool boolValue => boolValue ? "1" : "0",
+                        DateTime dateTimeValue => dateTimeValue.ToString("yyyy-MM-dd HH:mm:ss.ffffff"),
+                        DateTimeOffset dateTimeOffsetValue => dateTimeOffsetValue.Offset == TimeSpan.Zero
+                            ? dateTimeOffsetValue.ToString("yyyy-MM-dd HH:mm:ss.ffffff")
+                            : throw new ArgumentException($"Cannot write DateTimeOffset with Offset={dateTimeOffsetValue.Offset}, only offset 0 (UTC) is supported.", nameof(value)),
 #if NET
-                    else if (value is DateOnly dateOnlyValue)
-                    {
-                        await writer.WriteAsync(EscapeTsv(dateOnlyValue.ToString("yyyy-MM-dd"))).ConfigureAwait(false);
-                    }
-                    else if (value is TimeOnly timeOnly)
-                    {
-                        await writer.WriteAsync(EscapeTsv(timeOnly.ToString("HH:mm:ss.ffffff"))).ConfigureAwait(false);
-                    }
+                        DateOnly dateOnlyValue => dateOnlyValue.ToString("yyyy-MM-dd"),
+                        TimeOnly timeOnlyValue => timeOnlyValue.ToString("HH:mm:ss.ffffff"),
 #endif
-                    else if (value is string[] stringArrayValue)
-                    {
-                        await writer.WriteAsync(EscapeTsv(JsonSerializer.Serialize(stringArrayValue))).ConfigureAwait(false);
-                    }
-                    else if (value is List<string> stringListValue)
-                    {
-                        await writer.WriteAsync(EscapeTsv(JsonSerializer.Serialize(stringListValue))).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        await writer.WriteAsync(EscapeTsv(value.ToString())).ConfigureAwait(false);
-                    }
+                        string[] stringArrayValue => EscapeTsv(JsonSerializer.Serialize(stringArrayValue)),
+                        List<string> stringListValue => EscapeTsv(JsonSerializer.Serialize(stringListValue)),
+                        null => "\\N",
+                        _ => EscapeTsv(model.Properties[i] is VectorPropertyModel ? JsonSerializer.Serialize(value) : value.ToString())
+                    };
+                    await writer.WriteAsync(escapedValue).ConfigureAwait(false);
 
                     var token = i + 1 == model.Properties.Count ? "\n" : "\t";
                     await writer.WriteAsync(token).ConfigureAwait(false);
@@ -118,7 +73,6 @@ internal static class TsvWriter<TRecord>
         }
         finally
         {
-            // This is EOF. LoadAsync waits for it.
             await pipeWriter.CompleteAsync(error).ConfigureAwait(false);
         }
     }
