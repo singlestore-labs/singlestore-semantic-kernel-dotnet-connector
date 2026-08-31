@@ -29,7 +29,7 @@ public record SingleStoreHotel<T>
     [VectorStoreData(StorageName = "parking_is_included")]
     public bool ParkingIncluded { get; set; }
 
-    [VectorStoreData]
+    [VectorStoreData(IsIndexed = true)]
     public List<string> Tags { get; set; } = [];
 
     /// <summary>A data field.</summary>
