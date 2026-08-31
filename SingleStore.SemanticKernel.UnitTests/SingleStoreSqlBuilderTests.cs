@@ -8,6 +8,13 @@ namespace SingleStore.SemanticKernel.UnitTests;
 
 public class SingleStoreSqlBuilderTests : IDisposable
 {
+#if NET
+    private const string NonNullableRefType = "NOT NULL";
+#else
+    // NRT annotations are only readable on .NET 6+; elsewhere reference types are assumed nullable.
+    private const string NonNullableRefType = "NULL";
+#endif
+
     private readonly SingleStoreConnection _connection = new("Host=localhost;Database=testdb;");
 
     public void Dispose()
@@ -50,7 +57,7 @@ public class SingleStoreSqlBuilderTests : IDisposable
         using var command = SingleStoreSqlBuilder.CreateTable(_connection, "testdb", "hotels", model);
 
         Assert.Equal(
-            """
+            $$"""
             CREATE TABLE IF NOT EXISTS `testdb`.`hotels`
             (
               `HotelId` LONGTEXT NULL,
@@ -58,8 +65,8 @@ public class SingleStoreSqlBuilderTests : IDisposable
               `HotelCode` INT NOT NULL,
               `HotelRating` FLOAT NULL,
               `parking_is_included` BOOL NOT NULL,
-              `Tags` JSON NOT NULL,
-              `Description` LONGTEXT NOT NULL,
+              `Tags` JSON {{NonNullableRefType}},
+              `Description` LONGTEXT {{NonNullableRefType}},
               `CreatedAt` DATETIME(6) NOT NULL,
               `UpdatedAt` DATETIME(6) NOT NULL,
               `DescriptionEmbedding` VECTOR(4, F32) NULL,
