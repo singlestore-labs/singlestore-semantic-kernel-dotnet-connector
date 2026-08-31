@@ -167,8 +167,8 @@ public class SingleStoreSqlBuilderTests : IDisposable
         var loader = new SingleStoreBulkLoader(_connection);
         SingleStoreSqlBuilder.ConfigureBulkLoadColumns(loader, model);
 
-        Assert.Equal(["`id`", "`hex_payload`", "`name`"], loader.Columns);
-        Assert.Equal(["`payload` = UNHEX(`hex_payload`)"], loader.Expressions);
+        Assert.Equal(["`id`", "@blob1", "`name`"], loader.Columns);
+        Assert.Equal(["`payload` = UNHEX(@blob1)"], loader.Expressions);
     }
 
     private static CollectionModel BuildHotelModel<TKey>(VectorStoreCollectionDefinition? definition = null)

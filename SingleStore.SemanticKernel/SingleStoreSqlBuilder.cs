@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 using Microsoft.Extensions.VectorData.ProviderServices;
@@ -51,14 +52,15 @@ internal static class SingleStoreSqlBuilder
 
     internal static void ConfigureBulkLoadColumns(SingleStoreBulkLoader loader, CollectionModel model)
     {
-        foreach (var property in model.Properties)
+        for (var i = 0; i < model.Properties.Count; i++)
         {
+            var property = model.Properties[i];
             var quoted = Builder.QuoteIdentifier(property.StorageName);
             if (property.Type == typeof(byte[]))
             {
-                var hexed = Builder.QuoteIdentifier($"hex_{property.StorageName}");
-                loader.Columns.Add(hexed);
-                loader.Expressions.Add($"{quoted} = UNHEX({hexed})");
+                var variable = "@blob" + i.ToString(CultureInfo.InvariantCulture);
+                loader.Columns.Add(variable);
+                loader.Expressions.Add($"{quoted} = UNHEX({variable})");
             }
             else
             {
