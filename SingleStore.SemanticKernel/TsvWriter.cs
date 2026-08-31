@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Pipelines;
 using System.Text;
 using System.Text.Json;
@@ -9,6 +10,12 @@ namespace SingleStore.SemanticKernel;
 internal static class TsvWriter<TRecord>
     where TRecord : class
 {
+    private const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss.ffffff";
+#if NET
+    private const string DateFormat = "yyyy-MM-dd";
+    private const string TimeFormat = "HH:mm:ss.ffffff";
+#endif
+
     internal static async Task WriteRecordsAsync(PipeWriter pipeWriter,
         CollectionModel model,
         IEnumerable<TRecord> records,
@@ -45,18 +52,19 @@ internal static class TsvWriter<TRecord>
                         Embedding<int> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
                         Embedding<long> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
                         bool boolValue => boolValue ? "1" : "0",
-                        DateTime dateTimeValue => dateTimeValue.ToString("yyyy-MM-dd HH:mm:ss.ffffff"),
+                        DateTime dateTimeValue => dateTimeValue.ToString(DateTimeFormat, CultureInfo.InvariantCulture),
                         DateTimeOffset dateTimeOffsetValue => dateTimeOffsetValue.Offset == TimeSpan.Zero
-                            ? dateTimeOffsetValue.ToString("yyyy-MM-dd HH:mm:ss.ffffff")
+                            ? dateTimeOffsetValue.ToString(DateTimeFormat, CultureInfo.InvariantCulture)
                             : throw new ArgumentException($"Cannot write DateTimeOffset with Offset={dateTimeOffsetValue.Offset}, only offset 0 (UTC) is supported.", nameof(value)),
 #if NET
-                        DateOnly dateOnlyValue => dateOnlyValue.ToString("yyyy-MM-dd"),
-                        TimeOnly timeOnlyValue => timeOnlyValue.ToString("HH:mm:ss.ffffff"),
+                        DateOnly dateOnlyValue => dateOnlyValue.ToString(DateFormat, CultureInfo.InvariantCulture),
+                        TimeOnly timeOnlyValue => timeOnlyValue.ToString(TimeFormat, CultureInfo.InvariantCulture),
 #endif
                         string[] stringArrayValue => EscapeTsv(JsonSerializer.Serialize(stringArrayValue)),
                         List<string> stringListValue => EscapeTsv(JsonSerializer.Serialize(stringListValue)),
+                        byte[] bytes => ToHex(bytes),
                         null => "\\N",
-                        _ => EscapeTsv(model.Properties[i] is VectorPropertyModel ? JsonSerializer.Serialize(value) : value.ToString()!)
+                        _ => EscapeTsv(model.Properties[i] is VectorPropertyModel ? JsonSerializer.Serialize(value) : FormatInvariant(value))
                     };
                     await WriteAsync(writer, escapedValue, cancellationToken).ConfigureAwait(false);
 
@@ -97,6 +105,20 @@ internal static class TsvWriter<TRecord>
 #else
         cancellationToken.ThrowIfCancellationRequested();
         return writer.FlushAsync();
+#endif
+    }
+
+    private static string FormatInvariant(object value)
+        => value is IFormattable formattable
+            ? formattable.ToString(null, CultureInfo.InvariantCulture)!
+            : value.ToString()!;
+
+    private static string ToHex(byte[] bytes)
+    {
+#if NET
+        return Convert.ToHexString(bytes);
+#else
+        return BitConverter.ToString(bytes).Replace("-", "");
 #endif
     }
 

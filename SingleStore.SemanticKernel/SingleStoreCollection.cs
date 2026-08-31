@@ -307,7 +307,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
 
             foreach (var record in recordsList)
             {
-                if (keyProperty.GetValue<Guid>(record) == Guid.Empty)
+                if (keyProperty.GetValueAsObject(record) is not Guid key || key == Guid.Empty)
                 {
                     keyProperty.SetValue(record, Guid.NewGuid());
                 }
@@ -329,7 +329,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
             EscapeCharacter = '\\',
             ConflictOption = SingleStoreBulkLoaderConflictOption.Replace
         };
-        loader.Columns.AddRange(_model.Properties.Select(propery => SingleStoreSqlBuilder.Builder.QuoteIdentifier(propery.StorageName)).ToList());
+        SingleStoreSqlBuilder.ConfigureBulkLoadColumns(loader, _model);
 
         await VectorStoreErrorHandler.RunOperationAsync<SingleStoreException>(
             _collectionMetadata,

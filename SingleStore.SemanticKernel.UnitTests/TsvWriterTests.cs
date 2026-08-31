@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Pipelines;
 using System.Text;
@@ -80,7 +81,7 @@ public class TsvWriterTests
 
         var output = await WriteAsync(model, [Row(("id", "a"), ("created", created))]);
 
-        Assert.Equal($"a\t{created:yyyy-MM-dd HH:mm:ss.ffffff}\n", output);
+        Assert.Equal($"a\t{created.ToString("yyyy-MM-dd HH:mm:ss.ffffff", CultureInfo.InvariantCulture)}\n", output);
     }
 
     [Fact]
@@ -93,7 +94,7 @@ public class TsvWriterTests
 
         var output = await WriteAsync(model, [Row(("id", "a"), ("updated", updated))]);
 
-        Assert.Equal($"a\t{updated:yyyy-MM-dd HH:mm:ss.ffffff}\n", output);
+        Assert.Equal($"a\t{updated.ToString("yyyy-MM-dd HH:mm:ss.ffffff", CultureInfo.InvariantCulture)}\n", output);
     }
 
     [Fact]
@@ -133,7 +134,7 @@ public class TsvWriterTests
 
         var output = await WriteAsync(model, [Row(("id", "a"), ("time", time))]);
 
-        Assert.Equal($"a\t{time:HH:mm:ss.ffffff}\n", output);
+        Assert.Equal($"a\t{time.ToString("HH:mm:ss.ffffff", CultureInfo.InvariantCulture)}\n", output);
     }
 #endif
 
@@ -162,6 +163,66 @@ public class TsvWriterTests
         var output = await WriteAsync(model, [Row(("id", "a"), ("name", "a\\b\tc\nd"))]);
 
         Assert.Equal("a\ta\\\\b\\\tc\\\nd\n", output);
+    }
+
+    [Fact]
+    public async Task WriteRecordsAsync_ByteArray_WritesHex()
+    {
+        var model = BuildModel(
+            new VectorStoreKeyProperty("id", typeof(string)),
+            new VectorStoreDataProperty("payload", typeof(byte[])));
+
+        var output = await WriteAsync(model, [Row(("id", "a"), ("payload", new byte[] { 0x00, 0x01, 0xFF, 0x0A, 0x09, (byte)'\\' }))]);
+
+        Assert.Equal("a\t0001FF0A095C\n", output);
+    }
+
+    [Fact]
+    public async Task WriteRecordsAsync_EmptyByteArray_WritesEmptyField()
+    {
+        var model = BuildModel(
+            new VectorStoreKeyProperty("id", typeof(string)),
+            new VectorStoreDataProperty("payload", typeof(byte[])));
+
+        var output = await WriteAsync(model, [Row(("id", "a"), ("payload", Array.Empty<byte>()))]);
+
+        Assert.Equal("a\t\n", output);
+    }
+
+    [Fact]
+    public async Task WriteRecordsAsync_NumericAndDateTime_UsesInvariantCulture()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+        culture.NumberFormat.NumberDecimalSeparator = ",";
+        culture.DateTimeFormat.TimeSeparator = ".";
+        CultureInfo.CurrentCulture = culture;
+        try
+        {
+            var model = BuildModel(
+                new VectorStoreKeyProperty("id", typeof(string)),
+                new VectorStoreDataProperty("rating", typeof(float)),
+                new VectorStoreDataProperty("score", typeof(double)),
+                new VectorStoreDataProperty("price", typeof(decimal)),
+                new VectorStoreDataProperty("created", typeof(DateTime)));
+            var created = new DateTime(2024, 3, 15, 8, 9, 10, 123).AddTicks(4567);
+
+            var output = await WriteAsync(model, [Row(
+                ("id", "a"),
+                ("rating", 1.5f),
+                ("score", 2.25d),
+                ("price", 3.5m),
+                ("created", created))]);
+
+            Assert.Equal(
+                $"a\t1.5\t2.25\t3.5\t{created.ToString("yyyy-MM-dd HH:mm:ss.ffffff", CultureInfo.InvariantCulture)}\n",
+                output);
+            Assert.DoesNotContain(",", output);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
     }
 
     [Fact]

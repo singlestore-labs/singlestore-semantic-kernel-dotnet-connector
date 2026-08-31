@@ -49,6 +49,24 @@ internal static class SingleStoreSqlBuilder
         return $"{quotedDatabase}.{quotedTable}";
     }
 
+    internal static void ConfigureBulkLoadColumns(SingleStoreBulkLoader loader, CollectionModel model)
+    {
+        foreach (var property in model.Properties)
+        {
+            var quoted = Builder.QuoteIdentifier(property.StorageName);
+            if (property.Type == typeof(byte[]))
+            {
+                var hexed = Builder.QuoteIdentifier($"hex_{property.StorageName}");
+                loader.Columns.Add(hexed);
+                loader.Expressions.Add($"{quoted} = UNHEX({hexed})");
+            }
+            else
+            {
+                loader.Columns.Add(quoted);
+            }
+        }
+    }
+
     internal static SingleStoreCommand CreateTable(SingleStoreConnection connection, string database, string table, CollectionModel model)
     {
         var command = connection.CreateCommand();

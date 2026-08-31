@@ -69,7 +69,7 @@ public class SingleStoreSqlBuilderTests : IDisposable
               FULLTEXT USING VERSION 2 (`HotelName`, `Description`),
               VECTOR KEY (`DescriptionEmbedding`) INDEX_OPTIONS '{ "metric_type":"EUCLIDEAN_DISTANCE", "index_type":"HNSW_FLAT" }'
             )
-            """,
+            """.Replace("\r\n", "\n"),
             command.CommandText);
     }
 
@@ -147,6 +147,28 @@ public class SingleStoreSqlBuilderTests : IDisposable
             SingleStoreSqlBuilder.CreateTable(_connection, "testdb", "hotels", model));
 
         Assert.Contains(IndexKind.DiskAnn, exception.Message);
+    }
+
+    [Fact]
+    public void ConfigureBulkLoadColumns_ByteArray_LoadsViaUnhex()
+    {
+        var model = new SingleStoreModelBuilder().BuildDynamic(
+            new VectorStoreCollectionDefinition
+            {
+                Properties =
+                [
+                    new VectorStoreKeyProperty("id", typeof(string)),
+                    new VectorStoreDataProperty("payload", typeof(byte[])),
+                    new VectorStoreDataProperty("name", typeof(string))
+                ]
+            },
+            null);
+
+        var loader = new SingleStoreBulkLoader(_connection);
+        SingleStoreSqlBuilder.ConfigureBulkLoadColumns(loader, model);
+
+        Assert.Equal(["`id`", "`hex_payload`", "`name`"], loader.Columns);
+        Assert.Equal(["`payload` = UNHEX(`hex_payload`)"], loader.Expressions);
     }
 
     private static CollectionModel BuildHotelModel<TKey>(VectorStoreCollectionDefinition? definition = null)
