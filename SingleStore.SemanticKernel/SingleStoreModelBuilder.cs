@@ -73,7 +73,6 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
                type == typeof(string) || // LONGTEXT
                type == typeof(byte[]) || // LONGBLOB
                type == typeof(DateTime) || // DATETIME(6)
-               // TODO: SingleStore does not support time zones; we must decide how to handle this type later
                type == typeof(DateTimeOffset) || // DATETIME(6)
 #if NET
                type == typeof(DateOnly) || // DATE

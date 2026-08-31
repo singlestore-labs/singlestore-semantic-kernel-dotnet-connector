@@ -244,7 +244,6 @@ internal static class SingleStoreSqlBuilder
             not null when t == typeof(DateOnly) => "DATE",
             not null when t == typeof(TimeOnly) => "TIME(6)",
 #endif
-            // TODO: SingleStore does not have a dedicated GUID type. Verify that GUID values are written and read correctly.
             not null when t == typeof(Guid) => "CHAR(36)",
             not null when t == typeof(string[]) || t == typeof(List<string>) => "JSON",
             _ => throw new NotSupportedException($"Type {property.Type} is not supported.")
