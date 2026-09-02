@@ -23,7 +23,7 @@ internal static class LoadLocalInfile
         }
 
         throw new ArgumentException(
-            "The SingleStore data source must have AllowLoadLocalInfile=true in its connection string, because upserts use LOAD DATA LOCAL INFILE.",
+            "The SingleStore data source must have AllowLoadLocalInfile=true, because upserts use LOAD DATA LOCAL INFILE.",
             nameof(dataSource));
     }
 }
