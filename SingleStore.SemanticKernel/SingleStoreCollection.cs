@@ -342,10 +342,25 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
                     records,
                     generatedEmbeddings,
                     cancellationToken);
-                var loadTask = loader.LoadAsync(cancellationToken);
+                var loadTask = LoadAndCompleteReaderAsync(loader.LoadAsync(cancellationToken), pipe.Reader);
 
                 await Task.WhenAll(writeTask, loadTask).ConfigureAwait(false);
             });
+    }
+
+    private static async Task LoadAndCompleteReaderAsync(Task<int> loadTask, PipeReader reader)
+    {
+        try
+        {
+            await loadTask.ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // Completing with the failure hands it to the writer, so it stops early instead
+            // of filling a pipe nobody drains.
+            await reader.CompleteAsync(ex).ConfigureAwait(false);
+            throw;
+        }
     }
 
     /// <inheritdoc />
