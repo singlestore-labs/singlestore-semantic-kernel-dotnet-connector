@@ -89,7 +89,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     [RequiresUnreferencedCode(
         "This constructor is incompatible with trimming. For dynamic mapping via Dictionary<string, object?>, instantiate SingleStoreDynamicCollection instead")]
     public SingleStoreCollection(string connectionString, string name, SingleStoreCollectionOptions? options = default)
-        : this(new SingleStoreDataSource(connectionString), name, true, options)
+        : this(new SingleStoreDataSource(LoadLocalInfile.Enable(connectionString)), name, true, options)
     {
     }
 
@@ -105,6 +105,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
         try
         {
             Verify.NotNullOrWhiteSpace(name);
+            LoadLocalInfile.Require(dataSource);
 
             options ??= SingleStoreCollectionOptions.Default;
 

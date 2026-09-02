@@ -8,6 +8,7 @@ namespace SingleStore.SemanticKernel.UnitTests;
 public class SingleStoreVectorStoreTests
 {
     private const string TestConnectionString = "Host=localhost;Database=testdb;";
+    private const string TestDataSourceConnectionString = "Host=localhost;Database=testdb;AllowLoadLocalInfile=True;";
     private readonly SingleStoreVectorStore _store = new(TestConnectionString);
 
     [Fact]
@@ -43,7 +44,7 @@ public class SingleStoreVectorStoreTests
     [Fact]
     public void GetService_SingleStoreDataSource_ReturnsDataSource()
     {
-        using var dataSource = new SingleStoreDataSource(TestConnectionString);
+        using var dataSource = new SingleStoreDataSource(TestDataSourceConnectionString);
         using var dataSourceStore = new SingleStoreVectorStore(dataSource, false);
 
         var result = dataSourceStore.GetService(typeof(SingleStoreDataSource));
@@ -61,5 +62,25 @@ public class SingleStoreVectorStoreTests
     public void GetService_UnknownType_ReturnsNull()
     {
         Assert.Null(_store.GetService(typeof(string)));
+    }
+
+    [Fact]
+    public void ConnectionStringConstructor_EnablesAllowLoadLocalInfile()
+    {
+        using var store = new SingleStoreVectorStore(TestConnectionString);
+
+        var dataSource = Assert.IsType<SingleStoreDataSource>(store.GetService(typeof(SingleStoreDataSource)));
+        Assert.True(new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).AllowLoadLocalInfile);
+    }
+
+    [Fact]
+    public void DataSourceConstructor_WithoutAllowLoadLocalInfile_Throws()
+    {
+        using var dataSource = new SingleStoreDataSource(TestConnectionString);
+
+        var exception = Assert.Throws<ArgumentException>(() => new SingleStoreVectorStore(dataSource, false));
+
+        Assert.Equal("dataSource", exception.ParamName);
+        Assert.Contains("AllowLoadLocalInfile", exception.Message);
     }
 }

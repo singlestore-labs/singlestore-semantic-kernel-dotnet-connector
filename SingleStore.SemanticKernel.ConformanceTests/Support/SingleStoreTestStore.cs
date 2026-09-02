@@ -64,6 +64,7 @@ public class SingleStoreTestStore : TestStore
 
         CreateDatabase(connectionStringBuilder);
         connectionStringBuilder.Database = DefaultDatabase;
+        connectionStringBuilder.AllowLoadLocalInfile = true;
         _connectionString = connectionStringBuilder.ConnectionString;
 
         SingleStoreDataSourceBuilder dataSourceBuilder = new(_connectionString!);
