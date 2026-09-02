@@ -26,7 +26,7 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
     /// <inheritdoc />
     protected override bool SupportsKeyAutoGeneration(Type keyPropertyType)
     {
-        return keyPropertyType == typeof(long);
+        return keyPropertyType == typeof(Guid);
     }
 
     /// <inheritdoc />
@@ -40,7 +40,7 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
             && type != typeof(int) // INT
             && type != typeof(long) // BIGINT
             && type != typeof(string) // LONGTEXT
-            && type != typeof(Guid)) // BINARY(16)
+            && type != typeof(Guid)) // CHAR(36)
         {
             throw new NotSupportedException(
                 $"Property '{keyProperty.ModelName}' has unsupported type '{type.Name}'. Key properties must be one of the supported types: short, int, long, string, Guid");
@@ -73,19 +73,23 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
                type == typeof(string) || // LONGTEXT
                type == typeof(byte[]) || // LONGBLOB
                type == typeof(DateTime) || // DATETIME(6)
-               // TODO: SingleStore does not support time zones; we must decide how to handle this type later
                type == typeof(DateTimeOffset) || // DATETIME(6)
 #if NET
                type == typeof(DateOnly) || // DATE
                type == typeof(TimeOnly) || // TIME(6)
 #endif
-               type == typeof(Guid) || // BINARY(16)
+               type == typeof(Guid) || // CHAR(36)
                type == typeof(string[]) || // JSON
                type == typeof(List<string>); // JSON
     }
 
     /// <inheritdoc />
     protected override bool IsVectorPropertyTypeValid(Type type, [NotNullWhen(false)] out string? supportedTypes)
+    {
+        return IsVectorPropertyTypeValidCore(type, out supportedTypes);
+    }
+
+    internal static bool IsVectorPropertyTypeValidCore(Type type, [NotNullWhen(false)] out string? supportedTypes)
     {
         supportedTypes = "ReadOnlyMemory<sbyte>, Embedding<sbyte>, sbyte[], " +
                          "ReadOnlyMemory<short>, Embedding<short>, short[], " +
