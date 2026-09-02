@@ -18,6 +18,44 @@ internal static class SingleStoreSqlBuilder
         return value.Replace("%", "\\%").Replace("_", "\\_");
     }
 
+    internal static SingleStoreCommand Delete<TKey>(SingleStoreConnection connection,
+        string database,
+        string table,
+        KeyPropertyModel property,
+        TKey key)
+    {
+        var command = connection.CreateCommand();
+
+        var quotedTable = QuoteTable(database, table);
+        var quotedKeyColumn = Builder.QuoteIdentifier(property.StorageName);
+        command.CommandText = $"DELETE FROM {quotedTable} WHERE {quotedKeyColumn} = @key";
+        command.Parameters.AddWithValue("@key", key);
+
+        return command;
+    }
+
+    internal static SingleStoreCommand DeleteBatch<TKey>(SingleStoreConnection connection,
+        string database,
+        string table,
+        KeyPropertyModel property,
+        List<TKey> keys)
+    {
+        var command = connection.CreateCommand();
+
+        var counter = 0;
+        foreach (var key in keys)
+        {
+            var parameterName = $"@key{counter++}";
+            command.Parameters.AddWithValue(parameterName, key);
+        }
+
+        var quotedTable = QuoteTable(database, table);
+        var quotedKeyColumn = Builder.QuoteIdentifier(property.StorageName);
+        command.CommandText = $"DELETE FROM {quotedTable} WHERE {quotedKeyColumn} IN ({string.Join(", ", command.Parameters.Select(parameter => parameter.ParameterName))})";
+
+        return command;
+    }
+
     internal static SingleStoreCommand ShowTables(SingleStoreConnection connection, string database, string? table = null)
     {
         var command = connection.CreateCommand();

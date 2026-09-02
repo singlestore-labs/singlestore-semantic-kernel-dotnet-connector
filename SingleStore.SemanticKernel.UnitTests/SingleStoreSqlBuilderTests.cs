@@ -50,6 +50,32 @@ public class SingleStoreSqlBuilderTests : IDisposable
     }
 
     [Fact]
+    public void Delete_QuotesIdentifiersAndBindsKey()
+    {
+        var model = BuildHotelModel<string>();
+
+        using var command = SingleStoreSqlBuilder.Delete(_connection, "testdb", "hotels", model.KeyProperty, "h-1");
+
+        Assert.Equal("DELETE FROM `testdb`.`hotels` WHERE `HotelId` = @key", command.CommandText);
+        Assert.Single(command.Parameters);
+        Assert.Equal("h-1", command.Parameters["@key"].Value);
+    }
+
+    [Fact]
+    public void DeleteBatch_BuildsInClauseWithNumberedParameters()
+    {
+        var model = BuildHotelModel<int>();
+
+        using var command = SingleStoreSqlBuilder.DeleteBatch(_connection, "testdb", "hotels", model.KeyProperty, [1, 2, 3]);
+
+        Assert.Equal("DELETE FROM `testdb`.`hotels` WHERE `HotelId` IN (@key0, @key1, @key2)", command.CommandText);
+        Assert.Equal(3, command.Parameters.Count);
+        Assert.Equal(1, command.Parameters["@key0"].Value);
+        Assert.Equal(2, command.Parameters["@key1"].Value);
+        Assert.Equal(3, command.Parameters["@key2"].Value);
+    }
+
+    [Fact]
     public void CreateTable_FromHotel_BuildsExpectedSql()
     {
         var model = BuildHotelModel<string>();

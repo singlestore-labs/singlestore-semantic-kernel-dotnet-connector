@@ -231,15 +231,49 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     }
 
     /// <inheritdoc />
-    public override Task DeleteAsync(TKey key, CancellationToken cancellationToken = default)
+    public override async Task DeleteAsync(TKey key, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(key);
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = SingleStoreSqlBuilder.Delete(
+            connection,
+            _databaseName,
+            Name,
+            _model.KeyProperty,
+            key);
+
+        await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "Delete",
+            () => command.ExecuteNonQueryAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public override Task DeleteAsync(IEnumerable<TKey> keys, CancellationToken cancellationToken = default)
+    public override async Task DeleteAsync(IEnumerable<TKey> keys, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(keys);
+        var listOfKeys = keys.ToList();
+        if (listOfKeys.Count == 0)
+        {
+            return;
+        }
+
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = SingleStoreSqlBuilder.DeleteBatch(
+            connection,
+            _databaseName,
+            Name,
+            _model.KeyProperty,
+            listOfKeys);
+
+        await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "DeleteBatch",
+            () => command.ExecuteNonQueryAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
