@@ -1,5 +1,4 @@
 using System.Globalization;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 using Microsoft.Extensions.VectorData.ProviderServices;
 using SingleStoreConnector;
@@ -29,6 +28,27 @@ internal static class SingleStoreSqlBuilder
         var quotedTable = QuoteTable(database, table);
         var quotedKeyColumn = Builder.QuoteIdentifier(property.StorageName);
         command.CommandText = $"DELETE FROM {quotedTable} WHERE {quotedKeyColumn} = @key";
+        command.Parameters.AddWithValue("@key", key);
+
+        return command;
+    }
+
+    internal static SingleStoreCommand Select<TKey>(SingleStoreConnection connection,
+        string database,
+        string table,
+        CollectionModel model,
+        TKey key,
+        bool includeVectors)
+    {
+        var command = connection.CreateCommand();
+
+        var columns = string.Join(", ",
+            model.Properties
+                .Where(p => includeVectors || !(p is VectorPropertyModel))
+                .Select(p => Builder.QuoteIdentifier(p.StorageName)).ToList());
+        var quotedTable = QuoteTable(database, table);
+        var quotedKeyColumn = Builder.QuoteIdentifier(model.KeyProperty.StorageName);
+        command.CommandText = $"SELECT {columns} FROM {quotedTable} WHERE {quotedKeyColumn} = @key";
         command.Parameters.AddWithValue("@key", key);
 
         return command;
@@ -243,37 +263,7 @@ internal static class SingleStoreSqlBuilder
 
     private static string MapVectorTypeToSql(VectorPropertyModel property)
     {
-        var t = Nullable.GetUnderlyingType(property.EmbeddingType) ?? property.EmbeddingType;
-        var elementType = t switch
-        {
-            not null when t == typeof(ReadOnlyMemory<float>)
-                          || t == typeof(Embedding<float>)
-                          || t == typeof(float[])
-                => "F32",
-            not null when t == typeof(ReadOnlyMemory<double>)
-                          || t == typeof(Embedding<double>)
-                          || t == typeof(double[])
-                => "F64",
-            not null when t == typeof(ReadOnlyMemory<sbyte>)
-                          || t == typeof(Embedding<sbyte>)
-                          || t == typeof(sbyte[])
-                => "I8",
-            not null when t == typeof(ReadOnlyMemory<short>)
-                          || t == typeof(Embedding<short>)
-                          || t == typeof(short[])
-                => "I16",
-            not null when t == typeof(ReadOnlyMemory<int>)
-                          || t == typeof(Embedding<int>)
-                          || t == typeof(int[])
-                => "I32",
-            not null when t == typeof(ReadOnlyMemory<long>)
-                          || t == typeof(Embedding<long>)
-                          || t == typeof(long[])
-                => "I64",
-            _ => throw new NotSupportedException($"Type {property.EmbeddingType.Name} is not supported by this store.")
-        };
-
-        return $"VECTOR({property.Dimensions}, {elementType})";
+        return $"VECTOR({property.Dimensions}, F32)";
     }
 
     private static string MapTypeToSql(PropertyModel property)

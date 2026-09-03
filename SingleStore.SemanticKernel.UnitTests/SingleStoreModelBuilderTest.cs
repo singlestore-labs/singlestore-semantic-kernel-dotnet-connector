@@ -80,24 +80,9 @@ public class SingleStoreModelBuilderTest
     }
 
     [Theory]
-    [InlineData(typeof(ReadOnlyMemory<sbyte>))]
-    [InlineData(typeof(ReadOnlyMemory<short>))]
-    [InlineData(typeof(ReadOnlyMemory<int>))]
-    [InlineData(typeof(ReadOnlyMemory<long>))]
     [InlineData(typeof(ReadOnlyMemory<float>))]
-    [InlineData(typeof(ReadOnlyMemory<double>))]
-    [InlineData(typeof(double[]))]
-    [InlineData(typeof(sbyte[]))]
-    [InlineData(typeof(short[]))]
-    [InlineData(typeof(int[]))]
-    [InlineData(typeof(long[]))]
     [InlineData(typeof(float[]))]
-    [InlineData(typeof(Embedding<sbyte>))]
-    [InlineData(typeof(Embedding<short>))]
-    [InlineData(typeof(Embedding<int>))]
-    [InlineData(typeof(Embedding<long>))]
     [InlineData(typeof(Embedding<float>))]
-    [InlineData(typeof(Embedding<double>))]
     public void BuildDynamic_SupportedVectorType_Succeeds(Type vectorType)
     {
         var model = BuildDynamic(
@@ -134,7 +119,7 @@ public class SingleStoreModelBuilderTest
         var model = BuildDynamic(
             new VectorStoreKeyProperty("id", typeof(Guid)),
             new VectorStoreVectorProperty("embedding1", typeof(ReadOnlyMemory<float>), 10),
-            new VectorStoreVectorProperty("embedding2", typeof(ReadOnlyMemory<double>), 20));
+            new VectorStoreVectorProperty("embedding2", typeof(ReadOnlyMemory<float>), 20));
 
         Assert.Equal(2, model.VectorProperties.Count);
         Assert.Equal("embedding1", model.VectorProperties[0].ModelName);
