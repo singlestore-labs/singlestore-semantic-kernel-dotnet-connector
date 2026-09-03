@@ -96,7 +96,9 @@ internal sealed class SingleStoreMapper<TRecord>(CollectionModel model)
                         property.SetValue(record, reader.GetDateTime(ordinal)); // DATETIME(6)
                         break;
                     case var t when t == typeof(DateTimeOffset):
-                        property.SetValue(record, reader.GetFieldValue<DateTimeOffset>(ordinal)); // DATETIME(6)
+                        property.SetValue(record,
+                            new DateTimeOffset(
+                                DateTime.SpecifyKind(reader.GetDateTime(ordinal), DateTimeKind.Utc))); // DATETIME(6)
                         break;
 #if NET
                     case var t when t == typeof(DateOnly):
