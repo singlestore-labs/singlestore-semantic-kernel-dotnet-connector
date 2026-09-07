@@ -8,7 +8,6 @@ namespace SingleStore.SemanticKernel.UnitTests;
 public class SingleStoreDynamicCollectionTest
 {
     private const string TestConnectionString = "Host=localhost;Database=test;";
-    private const string TestDataSourceConnectionString = "Host=localhost;Database=test;AllowLoadLocalInfile=True;";
     private const string TestCollectionName = "testcollection";
 
     private static readonly SingleStoreCollectionOptions ValidOptions = new()
@@ -57,7 +56,7 @@ public class SingleStoreDynamicCollectionTest
     [Fact]
     public void WhenOwnsDataSourceAndConstructionFails_DisposesDataSource()
     {
-        var dataSource = new SingleStoreDataSource(TestDataSourceConnectionString);
+        var dataSource = new SingleStoreDataSource(TestConnectionString);
         var options = new SingleStoreCollectionOptions();
 
         Assert.Throws<ArgumentException>(() =>
@@ -69,7 +68,7 @@ public class SingleStoreDynamicCollectionTest
     [Fact]
     public void WhenDoesNotOwnDataSourceAndConstructionFails_DoesNotDisposeDataSource()
     {
-        using var dataSource = new SingleStoreDataSource(TestDataSourceConnectionString);
+        using var dataSource = new SingleStoreDataSource(TestConnectionString);
         var options = new SingleStoreCollectionOptions();
 
         Assert.Throws<ArgumentException>(() =>
@@ -93,7 +92,7 @@ public class SingleStoreDynamicCollectionTest
     [Fact]
     public void CanConstructFromDataSource()
     {
-        using var dataSource = new SingleStoreDataSource(TestDataSourceConnectionString);
+        using var dataSource = new SingleStoreDataSource(TestConnectionString);
         using var collection = new SingleStoreDynamicCollection(
             dataSource,
             TestCollectionName,
@@ -106,7 +105,7 @@ public class SingleStoreDynamicCollectionTest
     [Fact]
     public void Dispose_WhenOwnsDataSource_DisposesDataSource()
     {
-        var dataSource = new SingleStoreDataSource(TestDataSourceConnectionString);
+        var dataSource = new SingleStoreDataSource(TestConnectionString);
         var collection = new SingleStoreDynamicCollection(
             dataSource,
             TestCollectionName,
@@ -121,7 +120,7 @@ public class SingleStoreDynamicCollectionTest
     [Fact]
     public void Dispose_WhenDoesNotOwnDataSource_DoesNotDisposeDataSource()
     {
-        using var dataSource = new SingleStoreDataSource(TestDataSourceConnectionString);
+        using var dataSource = new SingleStoreDataSource(TestConnectionString);
         var collection = new SingleStoreDynamicCollection(
             dataSource,
             TestCollectionName,

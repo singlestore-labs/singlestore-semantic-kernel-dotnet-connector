@@ -38,7 +38,7 @@ public sealed class SingleStoreDynamicCollection : SingleStoreCollection<object,
     /// <param name="name">The name of the collection.</param>
     /// <param name="options">Optional configuration options for this class.</param>
     public SingleStoreDynamicCollection(string connectionString, string name, SingleStoreCollectionOptions options)
-        : this(new SingleStoreDataSource(LoadLocalInfile.Enable(connectionString)), name, true, options)
+        : this(SingleStoreUtil.CreateDataSource(connectionString), name, true, options)
     {
     }
 

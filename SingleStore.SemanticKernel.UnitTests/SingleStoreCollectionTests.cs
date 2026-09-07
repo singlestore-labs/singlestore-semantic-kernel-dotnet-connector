@@ -8,7 +8,6 @@ namespace SingleStore.SemanticKernel.UnitTests;
 public class SingleStoreCollectionTests
 {
     private const string TestConnectionString = "Host=localhost;Database=testdb;";
-    private const string TestDataSourceConnectionString = "Host=localhost;Database=testdb;AllowLoadLocalInfile=True;";
     private const string TestCollectionName = "testcollection";
 
     private readonly SingleStoreCollection<string, SingleStoreHotel<string>> _collection =
@@ -40,7 +39,7 @@ public class SingleStoreCollectionTests
     [Fact]
     public void GetService_SingleStoreDataSource_ReturnsDataSource()
     {
-        using var dataSource = new SingleStoreDataSource(TestDataSourceConnectionString);
+        using var dataSource = new SingleStoreDataSource(TestConnectionString);
         using var dataSourceCollection = new SingleStoreCollection<string, SingleStoreHotel<string>>(
             dataSource,
             TestCollectionName,
@@ -73,17 +72,5 @@ public class SingleStoreCollectionTests
 
         var dataSource = Assert.IsType<SingleStoreDataSource>(collection.GetService(typeof(SingleStoreDataSource)));
         Assert.True(new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).AllowLoadLocalInfile);
-    }
-
-    [Fact]
-    public void DataSourceConstructor_WithoutAllowLoadLocalInfile_Throws()
-    {
-        using var dataSource = new SingleStoreDataSource(TestConnectionString);
-
-        var exception = Assert.Throws<ArgumentException>(() =>
-            new SingleStoreCollection<string, SingleStoreHotel<string>>(dataSource, TestCollectionName, false));
-
-        Assert.Equal("dataSource", exception.ParamName);
-        Assert.Contains("AllowLoadLocalInfile", exception.Message);
     }
 }

@@ -44,8 +44,6 @@ public sealed class SingleStoreVectorStore : VectorStore
 
         try
         {
-            LoadLocalInfile.Require(dataSource);
-
             _embeddingGenerator = options?.EmbeddingGenerator;
             _dataSource = dataSource;
             _dataSourceArc = ownsDataSource ? new SingleStoreDataSourceArc(dataSource) : null;
@@ -73,7 +71,7 @@ public sealed class SingleStoreVectorStore : VectorStore
     /// <param name="connectionString">SingleStore database connection string.</param>
     /// <param name="options">Optional configuration options for this class.</param>
     public SingleStoreVectorStore(string connectionString, SingleStoreVectorStoreOptions? options = default) : this(
-        new SingleStoreDataSource(LoadLocalInfile.Enable(connectionString)),
+        SingleStoreUtil.CreateDataSource(connectionString),
         true,
         options)
     {
