@@ -62,4 +62,15 @@ public class SingleStoreCollectionTests
     {
         Assert.Null(_collection.GetService(typeof(string)));
     }
+
+    [Fact]
+    public void ConnectionStringConstructor_EnablesAllowLoadLocalInfile()
+    {
+        using var collection = new SingleStoreCollection<string, SingleStoreHotel<string>>(
+            TestConnectionString,
+            TestCollectionName);
+
+        var dataSource = Assert.IsType<SingleStoreDataSource>(collection.GetService(typeof(SingleStoreDataSource)));
+        Assert.True(new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).AllowLoadLocalInfile);
+    }
 }

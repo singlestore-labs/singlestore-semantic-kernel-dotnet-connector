@@ -11,7 +11,9 @@ public sealed class SingleStoreDynamicCollection : SingleStoreCollection<object,
     /// <summary>
     /// Initializes a new instance of the <see cref="SingleStoreDynamicCollection" /> class.
     /// </summary>
-    /// <param name="dataSource">The data source to use for connecting to the database.</param>
+    /// <param name="dataSource">
+    /// The data source to use for connecting to the database. Upserts require <c>AllowLoadLocalInfile=true</c> on this data source.
+    /// </param>
     /// <param name="name">The name of the collection.</param>
     /// <param name="ownsDataSource">
     /// A value indicating whether the data source should be disposed when the collection is
@@ -38,7 +40,7 @@ public sealed class SingleStoreDynamicCollection : SingleStoreCollection<object,
     /// <param name="name">The name of the collection.</param>
     /// <param name="options">Optional configuration options for this class.</param>
     public SingleStoreDynamicCollection(string connectionString, string name, SingleStoreCollectionOptions options)
-        : this(new SingleStoreDataSource(connectionString), name, true, options)
+        : this(SingleStoreUtil.CreateDataSource(connectionString), name, true, options)
     {
     }
 

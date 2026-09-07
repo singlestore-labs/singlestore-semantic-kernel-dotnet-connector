@@ -38,7 +38,7 @@ jobs:
           - 3306:3306
 
     env:
-      SingleStore__ConnectionString: "Server=127.0.0.1;Port=3306;User ID=root;Password=${{ secrets.SINGLESTORE_PASSWORD }}"
+      SingleStore__ConnectionString: "Server=127.0.0.1;Port=3306;User ID=root;Password=${{ secrets.SINGLESTORE_PASSWORD }};AllowLoadLocalInfile=True;"
 
     steps:
       - name: Check out repository

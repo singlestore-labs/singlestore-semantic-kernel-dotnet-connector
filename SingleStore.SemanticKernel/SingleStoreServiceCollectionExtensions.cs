@@ -27,6 +27,10 @@ public static class SingleStoreServiceCollectionExtensions
     /// <param name="options">Optional options to further configure the <see cref="VectorStore" />.</param>
     /// <param name="lifetime">The service lifetime for the store. Defaults to <see cref="ServiceLifetime.Singleton" />.</param>
     /// <returns>The service collection.</returns>
+    /// <remarks>
+    /// Upserts use LOAD DATA LOCAL INFILE. The <see cref="SingleStoreDataSource" /> registered in the container
+    /// must have <c>AllowLoadLocalInfile=true</c>; otherwise <c>UpsertAsync</c> will fail.
+    /// </remarks>
     public static IServiceCollection AddSingleStoreVectorStore(this IServiceCollection services,
         SingleStoreVectorStoreOptions? options = default,
         ServiceLifetime lifetime = ServiceLifetime.Singleton)
@@ -172,6 +176,10 @@ public static class SingleStoreServiceCollectionExtensions
     /// Defaults to <see cref="ServiceLifetime.Singleton" />.
     /// </param>
     /// <returns>Service collection.</returns>
+    /// <remarks>
+    /// Upserts use LOAD DATA LOCAL INFILE. The <see cref="SingleStoreDataSource" /> registered in the container
+    /// must have <c>AllowLoadLocalInfile=true</c>; otherwise <c>UpsertAsync</c> will fail.
+    /// </remarks>
     [RequiresDynamicCode(DynamicCodeMessage)]
     [RequiresUnreferencedCode(UnreferencedCodeMessage)]
     public static IServiceCollection AddSingleStoreCollection<TKey, TRecord>(this IServiceCollection services,

@@ -62,4 +62,13 @@ public class SingleStoreVectorStoreTests
     {
         Assert.Null(_store.GetService(typeof(string)));
     }
+
+    [Fact]
+    public void ConnectionStringConstructor_EnablesAllowLoadLocalInfile()
+    {
+        using var store = new SingleStoreVectorStore(TestConnectionString);
+
+        var dataSource = Assert.IsType<SingleStoreDataSource>(store.GetService(typeof(SingleStoreDataSource)));
+        Assert.True(new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).AllowLoadLocalInfile);
+    }
 }
