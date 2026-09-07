@@ -29,7 +29,9 @@ public sealed class SingleStoreVectorStore : VectorStore
     /// <summary>
     /// Initializes a new instance of the <see cref="SingleStoreVectorStore" /> class.
     /// </summary>
-    /// <param name="dataSource">SingleStore data source.</param>
+    /// <param name="dataSource">
+    /// SingleStore data source. Upserts require <c>AllowLoadLocalInfile=true</c> on this data source.
+    /// </param>
     /// <param name="ownsDataSource">
     /// A value indicating whether <paramref name="dataSource" /> is disposed when this instance
     /// of <see cref="SingleStoreVectorStore" /> is disposed. Ownership transfers immediately, so

@@ -34,7 +34,9 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     /// <summary>
     /// Initializes a new instance of the <see cref="SingleStoreCollection{TKey, TRecord}" /> class.
     /// </summary>
-    /// <param name="dataSource">The data source to use for connecting to the database.</param>
+    /// <param name="dataSource">
+    /// The data source to use for connecting to the database. Upserts require <c>AllowLoadLocalInfile=true</c> on this data source.
+    /// </param>
     /// <param name="name">The name of the collection.</param>
     /// <param name="ownsDataSource">A value indicating whether <paramref name="dataSource" /> is disposed when the collection is disposed. Ownership transfers immediately, so <paramref name="dataSource" /> is also disposed if this constructor throws.</param>
     /// <param name="options">Optional configuration options for this class.</param>
