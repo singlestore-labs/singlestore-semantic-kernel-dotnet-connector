@@ -260,6 +260,14 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
             return;
         }
 
+        foreach (var key in listOfKeys)
+        {
+            if (key == null)
+            {
+                throw new ArgumentException("Keys cannot contain null values", nameof(keys));
+            }
+        }
+
 
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = SingleStoreSqlBuilder.DeleteBatch(
