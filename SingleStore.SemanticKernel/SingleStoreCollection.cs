@@ -27,7 +27,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     private readonly SingleStoreDataSourceArc? _dataSourceArc;
     private readonly string _databaseName;
 
-    /// <summary>A mapper to use for converting between the data model and the Azure AI Search record.</summary>
+    /// <summary>A mapper to use for converting between the storage model and the data model for SingleStore vector store.</summary>
     private readonly SingleStoreMapper<TRecord> _mapper;
 
     /// <summary>The model for this collection.</summary>

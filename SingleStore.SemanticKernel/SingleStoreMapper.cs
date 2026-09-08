@@ -7,7 +7,7 @@ using Microsoft.Extensions.VectorData.ProviderServices;
 namespace SingleStore.SemanticKernel;
 
 /// <summary>
-/// A mapper class that handles the conversion between data models and storage models for SingleStore vector store.
+/// A mapper class that handles the conversion between storage models and data models for SingleStore vector store.
 /// </summary>
 /// <typeparam name="TRecord">The type of the data model record.</typeparam>
 internal sealed class SingleStoreMapper<TRecord>(CollectionModel model)
