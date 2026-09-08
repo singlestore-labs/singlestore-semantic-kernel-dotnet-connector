@@ -27,6 +27,9 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     private readonly SingleStoreDataSourceArc? _dataSourceArc;
     private readonly string _databaseName;
 
+    /// <summary>A mapper to use for converting between the storage model and the data model for SingleStore vector store.</summary>
+    private readonly SingleStoreMapper<TRecord> _mapper;
+
     /// <summary>The model for this collection.</summary>
     private readonly CollectionModel _model;
 
@@ -112,6 +115,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
 
             Name = name;
             _model = modelFactory(options);
+            _mapper = new SingleStoreMapper<TRecord>(_model);
 
             _dataSource = dataSource;
             _dataSourceArc = dataSourceArc;
@@ -208,11 +212,33 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     }
 
     /// <inheritdoc />
-    public override Task<TRecord?> GetAsync(TKey key,
+    public override async Task<TRecord?> GetAsync(TKey key,
         RecordRetrievalOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(key);
+
+        var includeVectors = options?.IncludeVectors is true;
+        if (includeVectors && _model.EmbeddingGenerationRequired)
+        {
+            throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
+        }
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using var command = SingleStoreSqlBuilder.Select(connection, _databaseName, Name, _model, key, includeVectors);
+
+        return await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "Get",
+            async () =>
+            {
+                using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                return reader.HasRows
+                    ? _mapper.MapFromStorageToDataModel(reader, includeVectors)
+                    : null;
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

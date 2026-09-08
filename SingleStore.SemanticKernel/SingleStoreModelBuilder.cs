@@ -15,12 +15,7 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
     /// <inheritdoc />
     protected override IReadOnlyList<EmbeddingGenerationDispatcher> EmbeddingGenerationDispatchers { get; } =
     [
-        EmbeddingGenerationDispatcher.Create<Embedding<float>>(),
-        EmbeddingGenerationDispatcher.Create<Embedding<double>>(),
-        EmbeddingGenerationDispatcher.Create<Embedding<sbyte>>(),
-        EmbeddingGenerationDispatcher.Create<Embedding<short>>(),
-        EmbeddingGenerationDispatcher.Create<Embedding<int>>(),
-        EmbeddingGenerationDispatcher.Create<Embedding<long>>()
+        EmbeddingGenerationDispatcher.Create<Embedding<float>>()
     ];
 
     /// <inheritdoc />
@@ -91,32 +86,12 @@ internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingO
 
     internal static bool IsVectorPropertyTypeValidCore(Type type, [NotNullWhen(false)] out string? supportedTypes)
     {
-        supportedTypes = "ReadOnlyMemory<sbyte>, Embedding<sbyte>, sbyte[], " +
-                         "ReadOnlyMemory<short>, Embedding<short>, short[], " +
-                         "ReadOnlyMemory<int>, Embedding<int>, int[], " +
-                         "ReadOnlyMemory<long>, Embedding<long>, long[], " +
-                         "ReadOnlyMemory<float>, Embedding<float>, float[], " +
-                         "ReadOnlyMemory<double>, Embedding<double>, double[]";
+        supportedTypes = "ReadOnlyMemory<float>, Embedding<float>, float[]";
 
         if (Nullable.GetUnderlyingType(type) is Type underlyingType) type = underlyingType;
 
-        return type == typeof(ReadOnlyMemory<sbyte>)
-               || type == typeof(Embedding<sbyte>)
-               || type == typeof(sbyte[])
-               || type == typeof(ReadOnlyMemory<short>)
-               || type == typeof(Embedding<short>)
-               || type == typeof(short[])
-               || type == typeof(ReadOnlyMemory<int>)
-               || type == typeof(Embedding<int>)
-               || type == typeof(int[])
-               || type == typeof(ReadOnlyMemory<long>)
-               || type == typeof(Embedding<long>)
-               || type == typeof(long[])
-               || type == typeof(ReadOnlyMemory<float>)
+        return type == typeof(ReadOnlyMemory<float>)
                || type == typeof(Embedding<float>)
-               || type == typeof(float[])
-               || type == typeof(ReadOnlyMemory<double>)
-               || type == typeof(Embedding<double>)
-               || type == typeof(double[]);
+               || type == typeof(float[]);
     }
 }

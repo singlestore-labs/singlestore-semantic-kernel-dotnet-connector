@@ -46,11 +46,6 @@ internal static class TsvWriter<TRecord>
                     var escapedValue = value switch
                     {
                         Embedding<float> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
-                        Embedding<double> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
-                        Embedding<sbyte> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
-                        Embedding<short> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
-                        Embedding<int> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
-                        Embedding<long> e => EscapeTsv(JsonSerializer.Serialize(e.Vector)),
                         bool boolValue => boolValue ? "1" : "0",
                         DateTime dateTimeValue => dateTimeValue.ToString(DateTimeFormat, CultureInfo.InvariantCulture),
                         DateTimeOffset dateTimeOffsetValue => dateTimeOffsetValue.Offset == TimeSpan.Zero

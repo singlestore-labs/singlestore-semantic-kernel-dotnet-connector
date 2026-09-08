@@ -76,6 +76,32 @@ public class SingleStoreSqlBuilderTests : IDisposable
     }
 
     [Fact]
+    public void Select_IncludesAllColumnsAndKeyParameter_WhenIncludeVectorsIsTrue()
+    {
+        var model = BuildHotelModel<string>();
+
+        using var command = SingleStoreSqlBuilder.Select(_connection, "testdb", "hotels", model, "id", true);
+
+        Assert.Equal(
+            "SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt`, `DescriptionEmbedding` FROM `testdb`.`hotels` WHERE `HotelId` = @key",
+            command.CommandText);
+        Assert.Equal("id", command.Parameters["@key"].Value);
+    }
+
+    [Fact]
+    public void Select_OmitsVectorColumns_WhenIncludeVectorsIsFalse()
+    {
+        var model = BuildHotelModel<string>();
+
+        using var command = SingleStoreSqlBuilder.Select(_connection, "testdb", "hotels", model, "id", false);
+
+        Assert.Equal(
+            "SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt` FROM `testdb`.`hotels` WHERE `HotelId` = @key",
+            command.CommandText);
+        Assert.Equal("id", command.Parameters["@key"].Value);
+    }
+
+    [Fact]
     public void CreateTable_FromHotel_BuildsExpectedSql()
     {
         var model = BuildHotelModel<string>();
@@ -84,25 +110,25 @@ public class SingleStoreSqlBuilderTests : IDisposable
 
         Assert.Equal(
             $$"""
-            CREATE TABLE IF NOT EXISTS `testdb`.`hotels`
-            (
-              `HotelId` LONGTEXT NULL,
-              `HotelName` LONGTEXT NULL,
-              `HotelCode` INT NOT NULL,
-              `HotelRating` FLOAT NULL,
-              `parking_is_included` BOOL NOT NULL,
-              `Tags` JSON {{NonNullableRefType}},
-              `Description` LONGTEXT {{NonNullableRefType}},
-              `CreatedAt` DATETIME(6) NOT NULL,
-              `UpdatedAt` DATETIME(6) NOT NULL,
-              `DescriptionEmbedding` VECTOR(4, F32) NULL,
-              PRIMARY KEY (`HotelId`),
-              INDEX (`HotelCode`),
-              MULTI VALUE INDEX (`Tags`) INDEX_OPTIONS='{"TOKENIZER":"MATCH_ANY", "PATH":[]}',
-              FULLTEXT USING VERSION 2 (`HotelName`, `Description`),
-              VECTOR KEY (`DescriptionEmbedding`) INDEX_OPTIONS '{ "metric_type":"EUCLIDEAN_DISTANCE", "index_type":"HNSW_FLAT" }'
-            )
-            """.Replace("\r\n", "\n"),
+                  CREATE TABLE IF NOT EXISTS `testdb`.`hotels`
+                  (
+                    `HotelId` LONGTEXT NULL,
+                    `HotelName` LONGTEXT NULL,
+                    `HotelCode` INT NOT NULL,
+                    `HotelRating` FLOAT NULL,
+                    `parking_is_included` BOOL NOT NULL,
+                    `Tags` JSON {{NonNullableRefType}},
+                    `Description` LONGTEXT {{NonNullableRefType}},
+                    `CreatedAt` DATETIME(6) NOT NULL,
+                    `UpdatedAt` DATETIME(6) NOT NULL,
+                    `DescriptionEmbedding` VECTOR(4, F32) NULL,
+                    PRIMARY KEY (`HotelId`),
+                    INDEX (`HotelCode`),
+                    MULTI VALUE INDEX (`Tags`) INDEX_OPTIONS='{"TOKENIZER":"MATCH_ANY", "PATH":[]}',
+                    FULLTEXT USING VERSION 2 (`HotelName`, `Description`),
+                    VECTOR KEY (`DescriptionEmbedding`) INDEX_OPTIONS '{ "metric_type":"EUCLIDEAN_DISTANCE", "index_type":"HNSW_FLAT" }'
+                  )
+                  """.Replace("\r\n", "\n"),
             command.CommandText);
     }
 
