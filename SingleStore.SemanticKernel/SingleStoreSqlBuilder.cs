@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq.Expressions;
 using Microsoft.Extensions.VectorData;
 using Microsoft.Extensions.VectorData.ProviderServices;
 using SingleStoreConnector;
@@ -71,6 +72,40 @@ internal static class SingleStoreSqlBuilder
         var quotedKeyColumn = Builder.QuoteIdentifier(model.KeyProperty.StorageName);
         command.CommandText = $"SELECT {columns} FROM {quotedTable} WHERE {quotedKeyColumn} = @key";
         command.Parameters.AddWithValue("@key", key);
+
+        return command;
+    }
+
+    internal static SingleStoreCommand SelectWhere<TRecord>(SingleStoreConnection connection,
+        string database,
+        string table,
+        CollectionModel model,
+        Expression<Func<TRecord, bool>> filter,
+        int top,
+        FilteredRecordRetrievalOptions<TRecord> options)
+    {
+        var command = connection.CreateCommand();
+
+        var columns = MapColumnsToSql(model.Properties, options.IncludeVectors);
+        var quotedTable = QuoteTable(database, table);
+        var (whereClause, whereClauseParameters) = MapFilterConditionToSql(model, filter);
+        var orderByValues = options.OrderBy?.Invoke(new FilteredRecordRetrievalOptions<TRecord>.OrderByDefinition()).Values;
+        var orderByClause = orderByValues == null || orderByValues.Count == 0
+            ? ""
+            : $"ORDER BY {
+                string.Join(", ", orderByValues.Select(sortInfo => MapSortInfoToSql(sortInfo, model)))
+            }";
+
+        command.CommandText = $"SELECT {columns}\n" +
+                              $"FROM {quotedTable}\n" +
+                              $"{whereClause}\n" +
+                              $"{orderByClause}\n" +
+                              $"LIMIT {top} OFFSET {options.Skip}";
+
+        foreach (var parameter in whereClauseParameters)
+        {
+            command.Parameters.Add(parameter);
+        }
 
         return command;
     }
@@ -208,6 +243,25 @@ internal static class SingleStoreSqlBuilder
             columns
                 .Where(p => includeVectors || !(p is VectorPropertyModel))
                 .Select(p => Builder.QuoteIdentifier(p.StorageName)).ToList());
+    }
+
+    private static (string Condition, List<SingleStoreParameter> Parameters) MapFilterConditionToSql(CollectionModel model, LambdaExpression? filter)
+    {
+        if (filter is null)
+        {
+            return (string.Empty, Parameters: new List<SingleStoreParameter>());
+        }
+
+        SingleStoreFilterTranslator translator = new(model, filter);
+        translator.Translate(true);
+        return (translator.Clause.ToString(), translator.Parameters);
+    }
+
+    private static string MapSortInfoToSql<TRecord>(FilteredRecordRetrievalOptions<TRecord>.OrderByDefinition.SortInfo sortInfo, CollectionModel model)
+    {
+        var column = Builder.QuoteIdentifier(model.GetDataOrKeyProperty(sortInfo.PropertySelector).StorageName);
+        var direction = sortInfo.Ascending ? "ASC" : "DESC";
+        return $"{column} {direction}";
     }
 
     private static string MapVectorKeyToSql(VectorPropertyModel property)
