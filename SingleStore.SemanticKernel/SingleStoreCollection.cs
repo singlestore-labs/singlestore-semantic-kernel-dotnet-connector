@@ -248,17 +248,24 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         Verify.NotNull(keys);
+        var listOfKeys = keys.ToList();
+        if (listOfKeys.Count == 0)
+        {
+            yield break;
+        }
+
+        foreach (var key in listOfKeys)
+        {
+            if (key == null)
+            {
+                throw new ArgumentException("Keys cannot contain null values", nameof(keys));
+            }
+        }
 
         var includeVectors = options?.IncludeVectors is true;
         if (includeVectors && _model.EmbeddingGenerationRequired)
         {
             throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
-        }
-
-        var listOfKeys = keys.ToList();
-        if (listOfKeys.Count == 0)
-        {
-            yield break;
         }
 
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
