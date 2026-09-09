@@ -102,6 +102,37 @@ public class SingleStoreSqlBuilderTests : IDisposable
     }
 
     [Fact]
+    public void SelectBatch_IncludesAllColumnsAndNumberedKeyParameters_WhenIncludeVectorsIsTrue()
+    {
+        var model = BuildHotelModel<string>();
+
+        using var command = SingleStoreSqlBuilder.SelectBatch(_connection, "testdb", "hotels", model, ["h-1", "h-2", "h-3"], true);
+
+        Assert.Equal(
+            "SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt`, `DescriptionEmbedding` FROM `testdb`.`hotels` WHERE `HotelId` IN (@key0, @key1, @key2)",
+            command.CommandText);
+        Assert.Equal(3, command.Parameters.Count);
+        Assert.Equal("h-1", command.Parameters["@key0"].Value);
+        Assert.Equal("h-2", command.Parameters["@key1"].Value);
+        Assert.Equal("h-3", command.Parameters["@key2"].Value);
+    }
+
+    [Fact]
+    public void SelectBatch_OmitsVectorColumns_WhenIncludeVectorsIsFalse()
+    {
+        var model = BuildHotelModel<int>();
+
+        using var command = SingleStoreSqlBuilder.SelectBatch(_connection, "testdb", "hotels", model, [1, 2], false);
+
+        Assert.Equal(
+            "SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt` FROM `testdb`.`hotels` WHERE `HotelId` IN (@key0, @key1)",
+            command.CommandText);
+        Assert.Equal(2, command.Parameters.Count);
+        Assert.Equal(1, command.Parameters["@key0"].Value);
+        Assert.Equal(2, command.Parameters["@key1"].Value);
+    }
+
+    [Fact]
     public void CreateTable_FromHotel_BuildsExpectedSql()
     {
         var model = BuildHotelModel<string>();

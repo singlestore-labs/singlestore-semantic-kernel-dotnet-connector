@@ -33,6 +33,33 @@ internal static class SingleStoreSqlBuilder
         return command;
     }
 
+    internal static SingleStoreCommand SelectBatch<TKey>(SingleStoreConnection connection,
+        string database,
+        string table,
+        CollectionModel model,
+        List<TKey> keys,
+        bool includeVectors)
+    {
+        var command = connection.CreateCommand();
+
+        var counter = 0;
+        foreach (var key in keys)
+        {
+            var parameterName = $"@key{counter++}";
+            command.Parameters.AddWithValue(parameterName, key);
+        }
+
+        var columns = string.Join(", ",
+            model.Properties
+                .Where(p => includeVectors || !(p is VectorPropertyModel))
+                .Select(p => Builder.QuoteIdentifier(p.StorageName)).ToList());
+        var quotedTable = QuoteTable(database, table);
+        var quotedKeyColumn = Builder.QuoteIdentifier(model.KeyProperty.StorageName);
+        command.CommandText = $"SELECT {columns} FROM {quotedTable} WHERE {quotedKeyColumn} IN ({string.Join(", ", command.Parameters.Select(parameter => parameter.ParameterName))})";
+
+        return command;
+    }
+
     internal static SingleStoreCommand Select<TKey>(SingleStoreConnection connection,
         string database,
         string table,
