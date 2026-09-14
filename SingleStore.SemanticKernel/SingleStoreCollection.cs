@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipelines;
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 using Microsoft.Extensions.VectorData.ProviderServices;
@@ -242,11 +243,44 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     }
 
     /// <inheritdoc />
-    public override IAsyncEnumerable<TRecord> GetAsync(IEnumerable<TKey> keys,
+    public override async IAsyncEnumerable<TRecord> GetAsync(IEnumerable<TKey> keys,
         RecordRetrievalOptions? options = null,
-        CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(keys);
+        var listOfKeys = keys.ToList();
+        if (listOfKeys.Count == 0)
+        {
+            yield break;
+        }
+
+        foreach (var key in listOfKeys)
+        {
+            if (key == null)
+            {
+                throw new ArgumentException("Keys cannot contain null values", nameof(keys));
+            }
+        }
+
+        var includeVectors = options?.IncludeVectors is true;
+        if (includeVectors && _model.EmbeddingGenerationRequired)
+        {
+            throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
+        }
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using var command = SingleStoreSqlBuilder.SelectBatch(connection, _databaseName, Name, _model, listOfKeys, includeVectors);
+
+        using var reader = await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "GetBatch",
+            () => command.ExecuteReaderAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadWithErrorHandlingAsync(_collectionMetadata, "GetBatch", cancellationToken).ConfigureAwait(false))
+        {
+            yield return _mapper.MapFromStorageToDataModel(reader, includeVectors);
+        }
     }
 
     /// <inheritdoc />
