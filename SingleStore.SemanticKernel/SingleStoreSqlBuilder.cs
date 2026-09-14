@@ -49,10 +49,7 @@ internal static class SingleStoreSqlBuilder
             command.Parameters.AddWithValue(parameterName, key);
         }
 
-        var columns = string.Join(", ",
-            model.Properties
-                .Where(p => includeVectors || !(p is VectorPropertyModel))
-                .Select(p => Builder.QuoteIdentifier(p.StorageName)).ToList());
+        var columns = MapColumnsToSql(model.Properties, includeVectors);
         var quotedTable = QuoteTable(database, table);
         var quotedKeyColumn = Builder.QuoteIdentifier(model.KeyProperty.StorageName);
         command.CommandText = $"SELECT {columns} FROM {quotedTable} WHERE {quotedKeyColumn} IN ({string.Join(", ", command.Parameters.Select(parameter => parameter.ParameterName))})";
@@ -69,10 +66,7 @@ internal static class SingleStoreSqlBuilder
     {
         var command = connection.CreateCommand();
 
-        var columns = string.Join(", ",
-            model.Properties
-                .Where(p => includeVectors || !(p is VectorPropertyModel))
-                .Select(p => Builder.QuoteIdentifier(p.StorageName)).ToList());
+        var columns = MapColumnsToSql(model.Properties, includeVectors);
         var quotedTable = QuoteTable(database, table);
         var quotedKeyColumn = Builder.QuoteIdentifier(model.KeyProperty.StorageName);
         command.CommandText = $"SELECT {columns} FROM {quotedTable} WHERE {quotedKeyColumn} = @key";
@@ -206,6 +200,14 @@ internal static class SingleStoreSqlBuilder
                               $"{string.Join(",\n  ", keys)}" +
                               "\n)";
         return command;
+    }
+
+    private static string MapColumnsToSql(IReadOnlyList<PropertyModel> columns, bool includeVectors)
+    {
+        return string.Join(", ",
+            columns
+                .Where(p => includeVectors || !(p is VectorPropertyModel))
+                .Select(p => Builder.QuoteIdentifier(p.StorageName)).ToList());
     }
 
     private static string MapVectorKeyToSql(VectorPropertyModel property)
