@@ -86,14 +86,26 @@ public class SingleStoreFilterTranslatorTests
     }
 
     [Fact]
-    public void Translate_ContainsOverCapturedArray_InlinesElements()
+    public void Translate_ContainsOverInlineArray_InlinesElements()
+    {
+        var translator = new SingleStoreFilterTranslator(_model, (SingleStoreHotel<string> r) => new[] { "a", "b" }.Contains(r.HotelName));
+        translator.Translate(true);
+
+        Assert.Equal("WHERE `HotelName` IN ('a', 'b')", translator.Clause.ToString());
+        Assert.Empty(translator.Parameters);
+    }
+
+    [Fact]
+    public void Translate_ContainsOverCapturedArray_ParameterizesElements()
     {
         var names = new[] { "a", "b" };
         var translator = new SingleStoreFilterTranslator(_model, (SingleStoreHotel<string> r) => names.Contains(r.HotelName));
         translator.Translate(true);
 
-        Assert.Equal("WHERE `HotelName` IN ('a', 'b')", translator.Clause.ToString());
-        Assert.Empty(translator.Parameters);
+        Assert.Equal("WHERE `HotelName` IN (@filter0, @filter1)", translator.Clause.ToString());
+        Assert.Equal(2, translator.Parameters.Count);
+        Assert.Equal("a", translator.Parameters[0].Value);
+        Assert.Equal("b", translator.Parameters[1].Value);
     }
 
     [Fact]
@@ -108,22 +120,28 @@ public class SingleStoreFilterTranslatorTests
     }
 
     [Fact]
-    public void Translate_AnyContainsOverInlineArray_UsesJsonMatchAnyIn()
+    public void Translate_AnyContainsOverInlineArray_ParameterizesElements()
     {
         var translator = new SingleStoreFilterTranslator(_model, (SingleStoreHotel<string> r) => r.Tags.Any(t => new[] { "pool", "spa" }.Contains(t)));
         translator.Translate(true);
 
-        Assert.Equal("WHERE JSON_MATCH_ANY(MATCH_PARAM_JSON() IN (TO_JSON('pool'), TO_JSON('spa')), `Tags`)", translator.Clause.ToString());
+        Assert.Equal("WHERE JSON_MATCH_ANY(MATCH_PARAM_JSON() IN (TO_JSON(@filter0), TO_JSON(@filter1)), `Tags`)", translator.Clause.ToString());
+        Assert.Equal(2, translator.Parameters.Count);
+        Assert.Equal("pool", translator.Parameters[0].Value);
+        Assert.Equal("spa", translator.Parameters[1].Value);
     }
 
     [Fact]
-    public void Translate_AnyContainsOverCapturedArray_UsesJsonMatchAnyIn()
+    public void Translate_AnyContainsOverCapturedArray_ParameterizesElements()
     {
         var tags = new[] { "pool", "spa" };
         var translator = new SingleStoreFilterTranslator(_model, (SingleStoreHotel<string> r) => r.Tags.Any(t => tags.Contains(t)));
         translator.Translate(true);
 
-        Assert.Equal("WHERE JSON_MATCH_ANY(MATCH_PARAM_JSON() IN (TO_JSON('pool'), TO_JSON('spa')), `Tags`)", translator.Clause.ToString());
+        Assert.Equal("WHERE JSON_MATCH_ANY(MATCH_PARAM_JSON() IN (TO_JSON(@filter0), TO_JSON(@filter1)), `Tags`)", translator.Clause.ToString());
+        Assert.Equal(2, translator.Parameters.Count);
+        Assert.Equal("pool", translator.Parameters[0].Value);
+        Assert.Equal("spa", translator.Parameters[1].Value);
     }
 
     [Fact]
@@ -148,29 +166,71 @@ public class SingleStoreFilterTranslatorTests
     }
 
     [Fact]
-    public void Translate_DateTime_UsesSingleStoreFormat()
+    public void Translate_DateTimeConstant_UsesSingleStoreFormat()
+    {
+        var translator = new SingleStoreFilterTranslator(
+            _model,
+            (SingleStoreHotel<string> r) => r.CreatedAt == new DateTime(2024, 6, 15, 13, 4, 5, 123));
+        translator.Translate(true);
+
+        Assert.Equal("WHERE (`CreatedAt` = '2024-06-15 13:04:05.123000')", translator.Clause.ToString());
+        Assert.Empty(translator.Parameters);
+    }
+
+    [Fact]
+    public void Translate_DateTimeOffsetUtcConstant_UsesSingleStoreFormat()
+    {
+        var translator = new SingleStoreFilterTranslator(
+            _model,
+            (SingleStoreHotel<string> r) => r.UpdatedAt == new DateTimeOffset(2024, 6, 15, 13, 4, 5, TimeSpan.FromHours(0)));
+        translator.Translate(true);
+
+        Assert.Equal("WHERE (`UpdatedAt` = '2024-06-15 13:04:05.000000')", translator.Clause.ToString());
+        Assert.Empty(translator.Parameters);
+    }
+
+    [Fact]
+    public void Translate_ContainsOverCapturedDateTimes_ParameterizesElements()
     {
         var createdAt = new DateTime(2024, 6, 15, 13, 4, 5, 123);
         var dates = new[] { createdAt };
         var translator = new SingleStoreFilterTranslator(_model, (SingleStoreHotel<string> r) => dates.Contains(r.CreatedAt));
         translator.Translate(true);
 
-        Assert.Equal(
-            $"WHERE `CreatedAt` IN ('{createdAt.ToString("yyyy-MM-dd HH:mm:ss.ffffff")}')",
-            translator.Clause.ToString());
+        Assert.Equal("WHERE `CreatedAt` IN (@filter0)", translator.Clause.ToString());
+        Assert.Equal(createdAt, Assert.Single(translator.Parameters).Value);
     }
 
     [Fact]
-    public void Translate_DateTimeOffsetUtc_UsesSingleStoreFormat()
+    public void Translate_ContainsOverCapturedDateTimeOffsets_ParameterizesElements()
     {
         var updatedAt = new DateTimeOffset(2024, 6, 15, 13, 4, 5, TimeSpan.Zero);
         var dates = new[] { updatedAt };
         var translator = new SingleStoreFilterTranslator(_model, (SingleStoreHotel<string> r) => dates.Contains(r.UpdatedAt));
         translator.Translate(true);
 
-        Assert.Equal(
-            $"WHERE `UpdatedAt` IN ('{updatedAt.ToString("yyyy-MM-dd HH:mm:ss.ffffff")}')",
-            translator.Clause.ToString());
+        Assert.Equal("WHERE `UpdatedAt` IN (@filter0)", translator.Clause.ToString());
+        Assert.Equal(updatedAt, Assert.Single(translator.Parameters).Value);
+    }
+
+    [Fact]
+    public void Translate_StringConstant_EscapesQuotesAndBackslashes()
+    {
+        var translator = new SingleStoreFilterTranslator(_model, (SingleStoreHotel<string> r) => r.HotelName == "O'Brien\\suite");
+        translator.Translate(true);
+
+        Assert.Equal("WHERE (`HotelName` = 'O\\'Brien\\\\suite')", translator.Clause.ToString());
+        Assert.Empty(translator.Parameters);
+    }
+
+    [Fact]
+    public void Translate_ContainsOverArrayColumn_EscapesStringLiteral()
+    {
+        var translator = new SingleStoreFilterTranslator(_model, (SingleStoreHotel<string> r) => r.Tags.Contains("O'Brien"));
+        translator.Translate(true);
+
+        Assert.Equal("WHERE JSON_MATCH_ANY(MATCH_PARAM_JSON() = TO_JSON('O\\'Brien'), `Tags`)", translator.Clause.ToString());
+        Assert.Empty(translator.Parameters);
     }
 
     [Fact]

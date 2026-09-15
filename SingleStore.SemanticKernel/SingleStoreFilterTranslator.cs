@@ -28,6 +28,11 @@ internal sealed class SingleStoreFilterTranslator : SqlFilterTranslator
         _sql.Append(SingleStoreSqlBuilder.Builder.QuoteIdentifier(property.StorageName));
     }
 
+    private string EscapeStringLiteral(string s)
+    {
+        return s.Replace("\\", "\\\\").Replace("'", "\\'");
+    }
+
     protected override void TranslateConstant(object? value, bool isSearchCondition)
     {
         switch (value)
@@ -52,10 +57,13 @@ internal sealed class SingleStoreFilterTranslator : SqlFilterTranslator
                 _sql.Append('\'').Append(dateTimeOffset.ToString(DateTimeFormat, CultureInfo.InvariantCulture)).Append('\'');
                 return;
             case string[] stringArray:
-                _sql.Append('\'').Append(JsonSerializer.Serialize(stringArray).Replace("'", "''")).Append('\'');
+                _sql.Append('\'').Append(EscapeStringLiteral(JsonSerializer.Serialize(stringArray))).Append('\'');
                 return;
             case List<string> stringList:
-                _sql.Append('\'').Append(JsonSerializer.Serialize(stringList).Replace("'", "''")).Append('\'');
+                _sql.Append('\'').Append(EscapeStringLiteral(JsonSerializer.Serialize(stringList))).Append('\'');
+                return;
+            case string str:
+                _sql.Append('\'').Append(EscapeStringLiteral(str)).Append('\'');
                 return;
 
 #if NET
@@ -66,6 +74,15 @@ internal sealed class SingleStoreFilterTranslator : SqlFilterTranslator
                 _sql.Append('\'').Append(timeOnly.ToString(TimeFormat, CultureInfo.InvariantCulture)).Append('\'');
                 return;
 #endif
+            case float f:
+                _sql.Append(f.ToString(CultureInfo.InvariantCulture));
+                return;
+            case double d:
+                _sql.Append(d.ToString(CultureInfo.InvariantCulture));
+                return;
+            case decimal d:
+                _sql.Append(d.ToString(CultureInfo.InvariantCulture));
+                return;
 
             default:
                 base.TranslateConstant(value, isSearchCondition);
@@ -119,7 +136,7 @@ internal sealed class SingleStoreFilterTranslator : SqlFilterTranslator
                 _sql.Append(", ");
             }
 
-            TranslateConstant(element, false);
+            TranslateQueryParameter(element);
         }
 
         _sql.Append(')');
@@ -156,7 +173,7 @@ internal sealed class SingleStoreFilterTranslator : SqlFilterTranslator
             }
 
             _sql.Append("TO_JSON(");
-            TranslateConstant(element, false);
+            TranslateQueryParameter(element);
             _sql.Append(")");
         }
 
