@@ -133,6 +133,65 @@ public class SingleStoreSqlBuilderTests : IDisposable
     }
 
     [Fact]
+    public void SelectWhere_OmitsVectorColumnsAndAppliesLimitOffset()
+    {
+        var model = BuildHotelModel<string>();
+
+        using var command = SingleStoreSqlBuilder.SelectWhere(
+            _connection,
+            "testdb",
+            "hotels",
+            model,
+            r => r.HotelCode == 1,
+            10,
+            new FilteredRecordRetrievalOptions<SingleStoreHotel<string>>());
+
+        Assert.Equal(
+            """
+                SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt`
+                FROM `testdb`.`hotels`
+                WHERE (`HotelCode` = 1)
+
+                LIMIT 10 OFFSET 0
+                """.Replace("\r\n", "\n"),
+            command.CommandText);
+        Assert.Empty(command.Parameters);
+    }
+
+    [Fact]
+    public void SelectWhere_IncludesVectorColumnsOrderByAndFilterParameters()
+    {
+        var model = BuildHotelModel<string>();
+        var name = "Hilton";
+
+        using var command = SingleStoreSqlBuilder.SelectWhere(
+            _connection,
+            "testdb",
+            "hotels",
+            model,
+            r => r.HotelName == name,
+            3,
+            new FilteredRecordRetrievalOptions<SingleStoreHotel<string>>
+            {
+                IncludeVectors = true,
+                Skip = 5,
+                OrderBy = o => o.Ascending(r => r.HotelName).Descending(r => r.ParkingIncluded)
+            });
+
+        Assert.Equal(
+            """
+                SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt`, `DescriptionEmbedding`
+                FROM `testdb`.`hotels`
+                WHERE (`HotelName` = @filter0)
+                ORDER BY `HotelName` ASC, `parking_is_included` DESC
+                LIMIT 3 OFFSET 5
+                """.Replace("\r\n", "\n"),
+            command.CommandText);
+        Assert.Single(command.Parameters);
+        Assert.Equal("Hilton", command.Parameters["@filter0"].Value);
+    }
+
+    [Fact]
     public void CreateTable_FromHotel_BuildsExpectedSql()
     {
         var model = BuildHotelModel<string>();

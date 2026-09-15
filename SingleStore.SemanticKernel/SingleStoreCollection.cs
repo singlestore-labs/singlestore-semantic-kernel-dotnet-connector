@@ -284,12 +284,35 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     }
 
     /// <inheritdoc />
-    public override IAsyncEnumerable<TRecord> GetAsync(Expression<Func<TRecord, bool>> filter,
+    public override async IAsyncEnumerable<TRecord> GetAsync(Expression<Func<TRecord, bool>> filter,
         int top,
         FilteredRecordRetrievalOptions<TRecord>? options = null,
-        CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(filter);
+        Verify.NotLessThan(top, 1);
+
+        var includeVectors = options?.IncludeVectors is true;
+        if (includeVectors && _model.EmbeddingGenerationRequired)
+        {
+            throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
+        }
+
+        options ??= new FilteredRecordRetrievalOptions<TRecord>();
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = SingleStoreSqlBuilder.SelectWhere(connection, _databaseName, Name, _model, filter, top, options);
+
+        await using var reader = await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "GetWithFilter",
+            () => command.ExecuteReaderAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadWithErrorHandlingAsync(_collectionMetadata, "GetWithFilter", cancellationToken).ConfigureAwait(false))
+        {
+            yield return _mapper.MapFromStorageToDataModel(reader, options.IncludeVectors);
+        }
     }
 
     /// <inheritdoc />
