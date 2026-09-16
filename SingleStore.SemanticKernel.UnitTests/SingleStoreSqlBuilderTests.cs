@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.Extensions.VectorData;
 using Microsoft.Extensions.VectorData.ProviderServices;
@@ -21,6 +22,14 @@ public class SingleStoreSqlBuilderTests : IDisposable
     public void Dispose()
     {
         _connection.Dispose();
+    }
+
+    [Fact]
+    public void OptimizeTableFlush_QuotesDatabaseAndTable()
+    {
+        using var command = SingleStoreSqlBuilder.OptimizeTableFlush(_connection, "testdb", "hotels");
+
+        Assert.Equal("OPTIMIZE TABLE `testdb`.`hotels` FLUSH", command.CommandText);
     }
 
     [Fact]
@@ -351,6 +360,196 @@ public class SingleStoreSqlBuilderTests : IDisposable
                 1));
 
         Assert.Contains(DistanceFunction.ManhattanDistance, exception.Message);
+    }
+
+    [Fact]
+    public void SelectHybridSearch_OmitsVectorColumnsAndJoinsRankedSubqueries()
+    {
+        var model = BuildHotelModel<string>();
+        var vector = new[] { 0.1f, 0.2f, 0.3f, 0.4f };
+
+        using var command = SingleStoreSqlBuilder.SelectHybridSearch(
+            _connection,
+            "testdb",
+            "hotels",
+            model,
+            model.VectorProperties[0],
+            model.DataProperties.Single(property => property.StorageName == "Description"),
+            vector,
+            ["luxury", "spa"],
+            (Expression<Func<SingleStoreHotel<string>, bool>>?)null,
+            0,
+            false,
+            3);
+
+        Assert.Equal(
+            """
+                SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt`,
+                COALESCE(1.0/(60+sk_s2_semantik_search.sk_s2_hybrid_search_rank), 0.0) + COALESCE(1.0/(60+sk_s2_keyword_search.sk_s2_hybrid_search_rank), 0.0)  AS sk_s2_score
+                FROM
+                (
+                SELECT `HotelId` AS sk_s2_hybrid_search_id, RANK() OVER (ORDER BY `DescriptionEmbedding` <-> @vector ASC) as sk_s2_hybrid_search_rank
+                FROM `testdb`.`hotels`
+
+                ORDER BY `DescriptionEmbedding` <-> @vector ASC
+                LIMIT 20
+                ) AS sk_s2_semantik_search
+                FULL OUTER JOIN
+                (
+                SELECT `HotelId` AS sk_s2_hybrid_search_id, RANK() OVER (ORDER BY BM25(`testdb`.`hotels`, @BM25exp) DESC) as sk_s2_hybrid_search_rank
+                FROM `testdb`.`hotels`
+                WHERE MATCH (TABLE `testdb`.`hotels`) AGAINST (@BM25exp)
+                ORDER BY BM25(`testdb`.`hotels`, @BM25exp) DESC
+                LIMIT 20
+                ) AS sk_s2_keyword_search
+                ON sk_s2_semantik_search.sk_s2_hybrid_search_id = sk_s2_keyword_search.sk_s2_hybrid_search_id
+                JOIN `testdb`.`hotels`
+                ON `testdb`.`hotels`.`HotelId` = COALESCE(sk_s2_semantik_search.sk_s2_hybrid_search_id, sk_s2_keyword_search.sk_s2_hybrid_search_id)
+
+                ORDER BY sk_s2_score DESC
+                LIMIT 3 OFFSET 0
+                """.Replace("\r\n", "\n"),
+            command.CommandText);
+        Assert.Equal(2, command.Parameters.Count);
+        Assert.Same(vector, command.Parameters["@vector"].Value);
+        Assert.Equal("""Description:("luxury" "spa")""", command.Parameters["@BM25exp"].Value);
+    }
+
+    [Fact]
+    public void SelectHybridSearch_FilterAndScoreThreshold_AppliedToBothSubqueriesAndOuterQuery()
+    {
+        var model = BuildHotelModel<string>();
+        var vector = new[] { 1f, 2f, 3f, 4f };
+
+        using var command = SingleStoreSqlBuilder.SelectHybridSearch<SingleStoreHotel<string>>(
+            _connection,
+            "testdb",
+            "hotels",
+            model,
+            model.VectorProperties[0],
+            model.DataProperties.Single(property => property.StorageName == "HotelName"),
+            vector,
+            ["hilton"],
+            r => r.HotelCode == 1,
+            5,
+            true,
+            20,
+            0.5);
+
+        Assert.Equal(
+            """
+                SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt`, `DescriptionEmbedding`,
+                COALESCE(1.0/(60+sk_s2_semantik_search.sk_s2_hybrid_search_rank), 0.0) + COALESCE(1.0/(60+sk_s2_keyword_search.sk_s2_hybrid_search_rank), 0.0)  AS sk_s2_score
+                FROM
+                (
+                SELECT `HotelId` AS sk_s2_hybrid_search_id, RANK() OVER (ORDER BY `DescriptionEmbedding` <-> @vector ASC) as sk_s2_hybrid_search_rank
+                FROM `testdb`.`hotels`
+                WHERE (`HotelCode` = 1)
+                ORDER BY `DescriptionEmbedding` <-> @vector ASC
+                LIMIT 50
+                ) AS sk_s2_semantik_search
+                FULL OUTER JOIN
+                (
+                SELECT `HotelId` AS sk_s2_hybrid_search_id, RANK() OVER (ORDER BY BM25(`testdb`.`hotels`, @BM25exp) DESC) as sk_s2_hybrid_search_rank
+                FROM `testdb`.`hotels`
+                WHERE (`HotelCode` = 1) AND MATCH (TABLE `testdb`.`hotels`) AGAINST (@BM25exp)
+                ORDER BY BM25(`testdb`.`hotels`, @BM25exp) DESC
+                LIMIT 50
+                ) AS sk_s2_keyword_search
+                ON sk_s2_semantik_search.sk_s2_hybrid_search_id = sk_s2_keyword_search.sk_s2_hybrid_search_id
+                JOIN `testdb`.`hotels`
+                ON `testdb`.`hotels`.`HotelId` = COALESCE(sk_s2_semantik_search.sk_s2_hybrid_search_id, sk_s2_keyword_search.sk_s2_hybrid_search_id)
+                WHERE sk_s2_score >= @scoreThreshold
+                ORDER BY sk_s2_score DESC
+                LIMIT 20 OFFSET 5
+                """.Replace("\r\n", "\n"),
+            command.CommandText);
+        Assert.Equal(3, command.Parameters.Count);
+        Assert.Equal(0.5, command.Parameters["@scoreThreshold"].Value);
+        Assert.Same(vector, command.Parameters["@vector"].Value);
+        Assert.Equal("""HotelName:("hilton")""", command.Parameters["@BM25exp"].Value);
+    }
+
+    [Theory]
+    [InlineData(DistanceFunction.EuclideanDistance, "<->", "ASC")]
+    [InlineData(DistanceFunction.EuclideanSquaredDistance, "<->", "ASC")]
+    [InlineData(DistanceFunction.DotProductSimilarity, "<*>", "DESC")]
+    [InlineData(DistanceFunction.NegativeDotProductSimilarity, "<*>", "DESC")]
+    [InlineData(null, "<*>", "DESC")]
+    public void SelectHybridSearch_SupportedDistanceFunctions_MapOperatorAndOrderOfSemanticSubquery(
+        string? distanceFunction,
+        string expectedOperator,
+        string expectedOrder)
+    {
+        var model = BuildHotelModel<string>();
+        model.VectorProperties[0].DistanceFunction = distanceFunction;
+
+        using var command = SingleStoreSqlBuilder.SelectHybridSearch(
+            _connection,
+            "testdb",
+            "hotels",
+            model,
+            model.VectorProperties[0],
+            model.DataProperties.Single(property => property.StorageName == "Description"),
+            new[] { 0.5f, 0.5f, 0.5f, 0.5f },
+            ["spa"],
+            (Expression<Func<SingleStoreHotel<string>, bool>>?)null,
+            0,
+            false,
+            3);
+
+        Assert.Contains(
+            $"RANK() OVER (ORDER BY `DescriptionEmbedding` {expectedOperator} @vector {expectedOrder}) as sk_s2_hybrid_search_rank",
+            command.CommandText);
+        Assert.Contains($"ORDER BY `DescriptionEmbedding` {expectedOperator} @vector {expectedOrder}\nLIMIT", command.CommandText);
+    }
+
+    [Fact]
+    public void SelectHybridSearch_UnsupportedDistanceFunction_Throws()
+    {
+        var model = BuildHotelModel<string>();
+        model.VectorProperties[0].DistanceFunction = DistanceFunction.ManhattanDistance;
+
+        var exception = Assert.Throws<NotSupportedException>(() =>
+            SingleStoreSqlBuilder.SelectHybridSearch(
+                _connection,
+                "testdb",
+                "hotels",
+                model,
+                model.VectorProperties[0],
+                model.DataProperties.Single(property => property.StorageName == "Description"),
+                new[] { 1f, 2f, 3f, 4f },
+                ["spa"],
+                (Expression<Func<SingleStoreHotel<string>, bool>>?)null,
+                0,
+                false,
+                3));
+
+        Assert.Contains(DistanceFunction.ManhattanDistance, exception.Message);
+    }
+
+    [Fact]
+    public void SelectHybridSearch_EscapesBm25SpecialCharactersInKeywords()
+    {
+        var model = BuildHotelModel<string>();
+
+        using var command = SingleStoreSqlBuilder.SelectHybridSearch(
+            _connection,
+            "testdb",
+            "hotels",
+            model,
+            model.VectorProperties[0],
+            model.DataProperties.Single(property => property.StorageName == "parking_is_included"),
+            new[] { 1f, 2f, 3f, 4f },
+            ["""a "quoted" word""", @"back\slash"],
+            (Expression<Func<SingleStoreHotel<string>, bool>>?)null,
+            0,
+            false,
+            3);
+
+        Assert.Equal(
+            """parking_is_included:("a \"quoted\" word" "back\\slash")""",
+            command.Parameters["@BM25exp"].Value);
     }
 
     [Fact]

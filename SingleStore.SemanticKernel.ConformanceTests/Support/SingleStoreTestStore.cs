@@ -33,6 +33,10 @@ public class SingleStoreTestStore : TestStore
 
     public static SingleStoreTestStore Instance { get; } = new();
 
+    public Version ServerVersion { get; private set; } = new(0, 0);
+
+    public bool SupportsMultiValueHashIndex => ServerVersion.Major >= 9;
+
     public SingleStoreVectorStore GetVectorStore(SingleStoreVectorStoreOptions options)
     {
         // The DataSource is shared with the static instance, we don't want any of the tests to dispose it.
@@ -82,10 +86,35 @@ public class SingleStoreTestStore : TestStore
         using var conn = new SingleStoreConnection(connectionStringBuilder.ConnectionString);
         conn.Open();
 
-        using var command = new SingleStoreCommand($"DROP DATABASE IF EXISTS {DefaultDatabase}", conn);
+        using var command = new SingleStoreCommand("SELECT @@memsql_version", conn);
+        var rawVersion = (string)command.ExecuteScalar()!;
+        ServerVersion = Version.Parse(rawVersion.Split('-', '+')[0]);
+
+        // Workaround for ECS-3820
+        command.CommandText = "SET GLOBAL vector_index_fallback_non_index_scan = false";
+        command.ExecuteNonQuery();
+
+        command.CommandText = $"DROP DATABASE IF EXISTS {DefaultDatabase}";
         command.ExecuteNonQuery();
         command.CommandText = $"CREATE DATABASE {DefaultDatabase}";
         command.ExecuteNonQuery();
+    }
+
+    internal void DisableUnsupportedJsonIndexes(IEnumerable<VectorStoreProperty> properties)
+    {
+        if (SupportsMultiValueHashIndex)
+        {
+            return;
+        }
+
+        foreach (var property in properties)
+        {
+            if (property is VectorStoreDataProperty dataProperty
+                && (dataProperty.Type == typeof(string[]) || dataProperty.Type == typeof(List<string>)))
+            {
+                dataProperty.IsIndexed = false;
+            }
+        }
     }
 
     protected override async Task StopAsync()

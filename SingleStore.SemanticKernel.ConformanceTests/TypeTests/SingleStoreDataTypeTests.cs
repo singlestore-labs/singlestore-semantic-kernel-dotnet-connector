@@ -117,6 +117,7 @@ public class SingleStoreDataTypeTests(SingleStoreDataTypeTests.Fixture fixture)
             properties.Add(new VectorStoreDataProperty(nameof(Record.ULong), typeof(ulong)) { IsIndexed = true });
             properties.Add(new VectorStoreDataProperty(nameof(Record.ByteArray), typeof(byte[])));
             properties.Add(new VectorStoreDataProperty(nameof(Record.StringList), typeof(List<string>)) { IsIndexed = true });
+            SingleStoreTestStore.Instance.DisableUnsupportedJsonIndexes(properties);
             return properties;
         }
     }

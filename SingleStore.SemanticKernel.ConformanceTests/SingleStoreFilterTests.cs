@@ -1,3 +1,4 @@
+using Microsoft.Extensions.VectorData;
 using SingleStore.SemanticKernel.ConformanceTests.Support;
 using VectorData.ConformanceTests;
 using VectorData.ConformanceTests.Support;
@@ -33,5 +34,12 @@ public class SingleStoreFilterTests(SingleStoreFilterTests.Fixture fixture)
     public new class Fixture : FilterTests<int>.Fixture
     {
         public override TestStore TestStore => SingleStoreTestStore.Instance;
+
+        public override VectorStoreCollectionDefinition CreateRecordDefinition()
+        {
+            var definition = base.CreateRecordDefinition();
+            SingleStoreTestStore.Instance.DisableUnsupportedJsonIndexes(definition.Properties);
+            return definition;
+        }
     }
 }
