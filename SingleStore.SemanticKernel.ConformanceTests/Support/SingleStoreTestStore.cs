@@ -1,5 +1,6 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using Microsoft.Extensions.VectorData;
 using SingleStoreConnector;
 using VectorData.ConformanceTests.Support;
 
@@ -21,10 +22,12 @@ public class SingleStoreTestStore : TestStore
 
     private SingleStoreDataSource? _dataSource;
     private bool _useExternalInstance;
-
+    
     private SingleStoreTestStore()
     {
     }
+
+    public override string DefaultDistanceFunction => DistanceFunction.EuclideanDistance;
 
     public SingleStoreDataSource DataSource => _dataSource ?? throw new InvalidOperationException("Not initialized");
 

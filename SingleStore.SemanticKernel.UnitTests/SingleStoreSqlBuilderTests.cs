@@ -1,4 +1,5 @@
 using System;
+using System.Linq.Expressions;
 using Microsoft.Extensions.VectorData;
 using Microsoft.Extensions.VectorData.ProviderServices;
 using SingleStoreConnector;
@@ -156,6 +157,200 @@ public class SingleStoreSqlBuilderTests : IDisposable
                 """.Replace("\r\n", "\n"),
             command.CommandText);
         Assert.Empty(command.Parameters);
+    }
+
+    [Fact]
+    public void SelectVectorSearch_OmitsVectorColumns_WhenIncludeVectorsIsFalse()
+    {
+        var model = BuildHotelModel<string>();
+        var vector = new[] { 0.1f, 0.2f, 0.3f, 0.4f };
+
+        using var command = SingleStoreSqlBuilder.SelectVectorSearch(
+            _connection,
+            "testdb",
+            "hotels",
+            model,
+            model.VectorProperties[0],
+            vector,
+            (Expression<Func<SingleStoreHotel<string>, bool>>?)null,
+            0,
+            false,
+            10);
+
+        Assert.Equal(
+            """
+                SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt`, `DescriptionEmbedding` <-> @vector AS sk_s2_distance, sk_s2_distance AS sk_s2_score
+                FROM `testdb`.`hotels`
+
+                ORDER BY sk_s2_distance ASC
+                LIMIT 10 OFFSET 0
+                """.Replace("\r\n", "\n"),
+            command.CommandText);
+        Assert.Single(command.Parameters);
+        Assert.Same(vector, command.Parameters["@vector"].Value);
+    }
+
+    [Fact]
+    public void SelectVectorSearch_IncludesVectorColumnsFilterSkipAndParameters()
+    {
+        var model = BuildHotelModel<string>();
+        var vector = new[] { 1f, 2f, 3f, 4f };
+        var name = "Hilton";
+
+        using var command = SingleStoreSqlBuilder.SelectVectorSearch<SingleStoreHotel<string>>(
+            _connection,
+            "testdb",
+            "hotels",
+            model,
+            model.VectorProperties[0],
+            vector,
+            r => r.HotelName == name,
+            5,
+            true,
+            3);
+
+        Assert.Equal(
+            """
+                SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt`, `DescriptionEmbedding`, `DescriptionEmbedding` <-> @vector AS sk_s2_distance, sk_s2_distance AS sk_s2_score
+                FROM `testdb`.`hotels`
+                WHERE (`HotelName` = @filter0)
+                ORDER BY sk_s2_distance ASC
+                LIMIT 3 OFFSET 5
+                """.Replace("\r\n", "\n"),
+            command.CommandText);
+        Assert.Equal(2, command.Parameters.Count);
+        Assert.Same(vector, command.Parameters["@vector"].Value);
+        Assert.Equal("Hilton", command.Parameters["@filter0"].Value);
+    }
+
+    [Theory]
+    [InlineData(DistanceFunction.EuclideanDistance, "<->", "ASC", "sk_s2_distance", "<=")]
+    [InlineData(DistanceFunction.EuclideanSquaredDistance, "<->", "ASC", "POW(sk_s2_distance, 2)", "<=")]
+    [InlineData(DistanceFunction.DotProductSimilarity, "<*>", "DESC", "sk_s2_distance", ">=")]
+    [InlineData(DistanceFunction.NegativeDotProductSimilarity, "<*>", "DESC", "-(sk_s2_distance)", "<=")]
+    public void SelectVectorSearch_SupportedDistanceFunctions_MapOperatorOrderScoreAndThreshold(
+        string distanceFunction,
+        string expectedOperator,
+        string expectedOrder,
+        string expectedScore,
+        string expectedThresholdSign)
+    {
+        var model = BuildHotelModel<string>();
+        model.VectorProperties[0].DistanceFunction = distanceFunction;
+        var vector = new[] { 0.5f, 0.5f, 0.5f, 0.5f };
+
+        using var command = SingleStoreSqlBuilder.SelectVectorSearch(
+            _connection,
+            "testdb",
+            "hotels",
+            model,
+            model.VectorProperties[0],
+            vector,
+            (Expression<Func<SingleStoreHotel<string>, bool>>?)null,
+            0,
+            false,
+            2,
+            0.25);
+
+        Assert.Equal(
+            $"""
+                 SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt`, `DescriptionEmbedding` {expectedOperator} @vector AS sk_s2_distance, {expectedScore} AS sk_s2_score
+                 FROM `testdb`.`hotels`
+                 WHERE sk_s2_score {expectedThresholdSign} @scoreThreshold
+                 ORDER BY sk_s2_distance {expectedOrder}
+                 LIMIT 2 OFFSET 0
+                 """.Replace("\r\n", "\n"),
+            command.CommandText);
+        Assert.Equal(2, command.Parameters.Count);
+        Assert.Equal(0.25, command.Parameters["@scoreThreshold"].Value);
+        Assert.Same(vector, command.Parameters["@vector"].Value);
+    }
+
+    [Fact]
+    public void SelectVectorSearch_NullDistanceFunction_UsesDotProductOperatorAndDescendingOrder()
+    {
+        var model = BuildHotelModel<string>();
+        model.VectorProperties[0].DistanceFunction = null;
+        var vector = new[] { 1f, 0f, 0f, 0f };
+
+        using var command = SingleStoreSqlBuilder.SelectVectorSearch(
+            _connection,
+            "testdb",
+            "hotels",
+            model,
+            model.VectorProperties[0],
+            vector,
+            (Expression<Func<SingleStoreHotel<string>, bool>>?)null,
+            1,
+            false,
+            4);
+
+        Assert.Equal(
+            """
+                SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt`, `DescriptionEmbedding` <*> @vector AS sk_s2_distance, sk_s2_distance AS sk_s2_score
+                FROM `testdb`.`hotels`
+
+                ORDER BY sk_s2_distance DESC
+                LIMIT 4 OFFSET 1
+                """.Replace("\r\n", "\n"),
+            command.CommandText);
+        Assert.Same(vector, command.Parameters["@vector"].Value);
+    }
+
+    [Fact]
+    public void SelectVectorSearch_ScoreThresholdAndFilter_CombinesWhereClause()
+    {
+        var model = BuildHotelModel<string>();
+        model.VectorProperties[0].DistanceFunction = DistanceFunction.DotProductSimilarity;
+        var vector = new[] { 0.1f, 0.2f, 0.3f, 0.4f };
+
+        using var command = SingleStoreSqlBuilder.SelectVectorSearch<SingleStoreHotel<string>>(
+            _connection,
+            "testdb",
+            "hotels",
+            model,
+            model.VectorProperties[0],
+            vector,
+            r => r.HotelCode == 1,
+            0,
+            false,
+            5,
+            0.8);
+
+        Assert.Equal(
+            """
+                SELECT `HotelId`, `HotelName`, `HotelCode`, `HotelRating`, `parking_is_included`, `Tags`, `Description`, `CreatedAt`, `UpdatedAt`, `DescriptionEmbedding` <*> @vector AS sk_s2_distance, sk_s2_distance AS sk_s2_score
+                FROM `testdb`.`hotels`
+                WHERE (`HotelCode` = 1) AND sk_s2_score >= @scoreThreshold
+                ORDER BY sk_s2_distance DESC
+                LIMIT 5 OFFSET 0
+                """.Replace("\r\n", "\n"),
+            command.CommandText);
+        Assert.Equal(2, command.Parameters.Count);
+        Assert.Equal(0.8, command.Parameters["@scoreThreshold"].Value);
+        Assert.Same(vector, command.Parameters["@vector"].Value);
+    }
+
+    [Fact]
+    public void SelectVectorSearch_UnsupportedDistanceFunction_Throws()
+    {
+        var model = BuildHotelModel<string>();
+        model.VectorProperties[0].DistanceFunction = DistanceFunction.ManhattanDistance;
+
+        var exception = Assert.Throws<NotSupportedException>(() =>
+            SingleStoreSqlBuilder.SelectVectorSearch(
+                _connection,
+                "testdb",
+                "hotels",
+                model,
+                model.VectorProperties[0],
+                new[] { 1f, 2f, 3f, 4f },
+                (Expression<Func<SingleStoreHotel<string>, bool>>?)null,
+                0,
+                false,
+                1));
+
+        Assert.Contains(DistanceFunction.ManhattanDistance, exception.Message);
     }
 
     [Fact]
