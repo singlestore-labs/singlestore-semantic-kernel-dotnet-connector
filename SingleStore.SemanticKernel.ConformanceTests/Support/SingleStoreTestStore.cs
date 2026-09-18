@@ -22,7 +22,7 @@ public class SingleStoreTestStore : TestStore
 
     private SingleStoreDataSource? _dataSource;
     private bool _useExternalInstance;
-    
+
     private SingleStoreTestStore()
     {
     }

@@ -6,13 +6,16 @@ namespace SingleStore.SemanticKernel;
 
 internal class SingleStoreModelBuilder() : CollectionModelBuilder(ModelBuildingOptions)
 {
+    // SingleStore vector indexes support only F32 vectors. See https://docs.singlestore.com/cloud/reference/sql-reference/vector-functions/vector-indexing/#syntax
+    // Therefore, we support only float vector types.
+    // This ensures that users can take advantage of vector indexes and maintain fast workflows.
+    internal const string SupportedVectorTypes = "ReadOnlyMemory<float>, Embedding<float>, float[]";
+
     public static readonly CollectionModelBuildingOptions ModelBuildingOptions = new()
     {
         RequiresAtLeastOneVector = false,
         SupportsMultipleVectors = true
     };
-
-    internal static readonly string SupportedVectorTypes = "ReadOnlyMemory<float>, Embedding<float>, float[]";
 
     /// <inheritdoc />
     protected override IReadOnlyList<EmbeddingGenerationDispatcher> EmbeddingGenerationDispatchers { get; } =

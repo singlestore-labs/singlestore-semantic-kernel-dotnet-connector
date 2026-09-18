@@ -126,23 +126,19 @@ internal static class SingleStoreSqlBuilder
 
         var columns = MapColumnsToSql(model.Properties, includeVectors);
         var quotedVectorColumn = Builder.QuoteIdentifier(property.StorageName);
-        var vectorOperator = MapVectorOperatorToSql(property.DistanceFunction);
+        var (vectorOperator, order, score, thresholdSign) = MapVectorSearchToSql(property.DistanceFunction);
         var (whereClause, whereClauseParameters) = MapFilterConditionToSql(model, filter);
         var quotedTableName = QuoteTable(database, table);
-        var order = MapVectorOrderToSql(property.DistanceFunction);
-        var score = MapVectorScoreToSql(property.DistanceFunction);
 
         if (scoreThreshold.HasValue)
         {
-            var sign = MapVectorThresholdSignToSql(property.DistanceFunction);
-
             if (whereClause.Length == 0)
             {
-                whereClause = $"WHERE {SingleStoreConstants.ScoreColumnName} {sign} @scoreThreshold";
+                whereClause = $"WHERE {SingleStoreConstants.ScoreColumnName} {thresholdSign} @scoreThreshold";
             }
             else
             {
-                whereClause = $"{whereClause} AND {SingleStoreConstants.ScoreColumnName} {sign} @scoreThreshold";
+                whereClause = $"{whereClause} AND {SingleStoreConstants.ScoreColumnName} {thresholdSign} @scoreThreshold";
             }
 
             command.Parameters.Add(new SingleStoreParameter("@scoreThreshold", scoreThreshold.Value));
@@ -290,46 +286,20 @@ internal static class SingleStoreSqlBuilder
         return command;
     }
 
-    private static string MapVectorThresholdSignToSql(string? distanceFunction)
+    private static (string Operator, string Order, string Score, string ThresholdSign) MapVectorSearchToSql(string? distanceFunction)
     {
         return distanceFunction switch
         {
-            DistanceFunction.EuclideanDistance
-                or DistanceFunction.EuclideanSquaredDistance
-                or DistanceFunction.NegativeDotProductSimilarity => "<=",
-            DistanceFunction.DotProductSimilarity or null => ">=",
-            _ => throw new NotSupportedException($"Distance function {distanceFunction} is not supported by this store.")
-        };
-    }
-
-    private static string MapVectorScoreToSql(string? distanceFunction)
-    {
-        return distanceFunction switch
-        {
-            DistanceFunction.EuclideanDistance or DistanceFunction.DotProductSimilarity or null => SingleStoreConstants.DistanceColumnName,
-            DistanceFunction.EuclideanSquaredDistance => $"POW({SingleStoreConstants.DistanceColumnName}, 2)",
-            DistanceFunction.NegativeDotProductSimilarity => $"-({SingleStoreConstants.DistanceColumnName})",
-            _ => throw new NotSupportedException($"Distance function {distanceFunction} is not supported by this store.")
-        };
-    }
-
-    private static string MapVectorOrderToSql(string? distanceFunction)
-    {
-        return distanceFunction switch
-        {
-            DistanceFunction.EuclideanDistance or DistanceFunction.EuclideanSquaredDistance => "ASC",
-            DistanceFunction.DotProductSimilarity or DistanceFunction.NegativeDotProductSimilarity or null => "DESC",
-            _ => throw new NotSupportedException($"Distance function {distanceFunction} is not supported by this store.")
-        };
-    }
-
-    private static string MapVectorOperatorToSql(string? distanceFunction)
-    {
-        return distanceFunction switch
-        {
-            DistanceFunction.EuclideanDistance or DistanceFunction.EuclideanSquaredDistance => "<->",
-            DistanceFunction.DotProductSimilarity or DistanceFunction.NegativeDotProductSimilarity or null => "<*>",
-            _ => throw new NotSupportedException($"Distance function {distanceFunction} is not supported by this store.")
+            DistanceFunction.EuclideanDistance =>
+                new ValueTuple<string, string, string, string>("<->", "ASC", SingleStoreConstants.DistanceColumnName, "<="),
+            DistanceFunction.EuclideanSquaredDistance =>
+                new ValueTuple<string, string, string, string>("<->", "ASC", $"POW({SingleStoreConstants.DistanceColumnName}, 2)", "<="),
+            DistanceFunction.NegativeDotProductSimilarity =>
+                new ValueTuple<string, string, string, string>("<*>", "DESC", $"-({SingleStoreConstants.DistanceColumnName})", "<="),
+            DistanceFunction.DotProductSimilarity or null =>
+                new ValueTuple<string, string, string, string>("<*>", "DESC", SingleStoreConstants.DistanceColumnName, ">="),
+            _ => throw new NotSupportedException(
+                $"Distance function {distanceFunction} is not supported by this store.")
         };
     }
 
