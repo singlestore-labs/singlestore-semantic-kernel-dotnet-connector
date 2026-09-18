@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using System.Linq.Expressions;
+using Microsoft.Extensions.VectorData;
 using Microsoft.Extensions.VectorData.ProviderServices;
 using Xunit;
 
@@ -7,6 +9,7 @@ namespace SingleStore.SemanticKernel.UnitTests;
 
 public class SingleStoreFilterTranslatorTests
 {
+    private readonly CollectionModel _integerModel = new SingleStoreModelBuilder().Build(typeof(IntegerRecord), typeof(string), null, null);
     private readonly CollectionModel _model = new SingleStoreModelBuilder().Build(typeof(SingleStoreHotel<string>), typeof(string), null, null);
 
     [Fact]
@@ -234,6 +237,46 @@ public class SingleStoreFilterTranslatorTests
     }
 
     [Fact]
+    public void Translate_SByteConstant_InlinesInvariantValue()
+    {
+        var translator = new SingleStoreFilterTranslator(_integerModel, EqualToConstant<sbyte>(r => r.SByteValue, -8));
+        translator.Translate(true);
+
+        Assert.Equal("WHERE (`SByteValue` = -8)", translator.Clause.ToString());
+        Assert.Empty(translator.Parameters);
+    }
+
+    [Fact]
+    public void Translate_UShortConstant_InlinesInvariantValue()
+    {
+        var translator = new SingleStoreFilterTranslator(_integerModel, EqualToConstant<ushort>(r => r.UShortValue, 65535));
+        translator.Translate(true);
+
+        Assert.Equal("WHERE (`UShortValue` = 65535)", translator.Clause.ToString());
+        Assert.Empty(translator.Parameters);
+    }
+
+    [Fact]
+    public void Translate_UIntConstant_InlinesInvariantValue()
+    {
+        var translator = new SingleStoreFilterTranslator(_integerModel, (IntegerRecord r) => r.UIntValue == 4000000000u);
+        translator.Translate(true);
+
+        Assert.Equal("WHERE (`UIntValue` = 4000000000)", translator.Clause.ToString());
+        Assert.Empty(translator.Parameters);
+    }
+
+    [Fact]
+    public void Translate_ULongConstant_InlinesInvariantValue()
+    {
+        var translator = new SingleStoreFilterTranslator(_integerModel, (IntegerRecord r) => r.ULongValue == 18446744073709551615ul);
+        translator.Translate(true);
+
+        Assert.Equal("WHERE (`ULongValue` = 18446744073709551615)", translator.Clause.ToString());
+        Assert.Empty(translator.Parameters);
+    }
+
+    [Fact]
     public void Translate_DateTimeOffsetWithOffset_ThrowsWhenInlined()
     {
         var translator = new SingleStoreFilterTranslator(
@@ -243,5 +286,32 @@ public class SingleStoreFilterTranslatorTests
         var exception = Assert.Throws<ArgumentException>(() => translator.Translate(true));
 
         Assert.Contains("offset 0", exception.Message);
+    }
+
+    private static Expression<Func<IntegerRecord, bool>> EqualToConstant<T>(
+        Expression<Func<IntegerRecord, T>> property,
+        T value)
+    {
+        var parameter = property.Parameters[0];
+        var body = Expression.Equal(property.Body, Expression.Constant(value, typeof(T)));
+        return Expression.Lambda<Func<IntegerRecord, bool>>(body, parameter);
+    }
+
+    private sealed class IntegerRecord
+    {
+        [VectorStoreKey]
+        public string Id { get; set; } = "";
+
+        [VectorStoreData]
+        public sbyte SByteValue { get; set; }
+
+        [VectorStoreData]
+        public ushort UShortValue { get; set; }
+
+        [VectorStoreData]
+        public uint UIntValue { get; set; }
+
+        [VectorStoreData]
+        public ulong ULongValue { get; set; }
     }
 }

@@ -19,6 +19,9 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     where TKey : notnull
     where TRecord : class
 {
+    /// <summary>The default options for vector search.</summary>
+    private static readonly VectorSearchOptions<TRecord> s_defaultVectorSearchOptions = new();
+
     /// <summary>Metadata about vector store record collection.</summary>
     private readonly VectorStoreCollectionMetadata _collectionMetadata;
 
@@ -491,12 +494,61 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
     }
 
     /// <inheritdoc />
-    public override IAsyncEnumerable<VectorSearchResult<TRecord>> SearchAsync<TInput>(TInput searchValue,
+    public override async IAsyncEnumerable<VectorSearchResult<TRecord>> SearchAsync<TInput>(TInput searchValue,
         int top,
         VectorSearchOptions<TRecord>? options = null,
-        CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        Verify.NotNull(searchValue);
+        Verify.NotLessThan(top, 1);
+
+        options ??= s_defaultVectorSearchOptions;
+        if (options.IncludeVectors && _model.EmbeddingGenerationRequired)
+        {
+            throw new NotSupportedException(VectorDataStrings.IncludeVectorsNotSupportedWithEmbeddingGeneration);
+        }
+
+        var vectorProperty = _model.GetVectorPropertyOrSingle(options);
+        object vector = searchValue switch
+        {
+            ReadOnlyMemory<float> or float[] => searchValue,
+            Embedding<float> e => e.Vector,
+
+            _ when vectorProperty.EmbeddingGenerationDispatcher is not null
+                => await vectorProperty.GenerateEmbeddingAsync(searchValue, cancellationToken).ConfigureAwait(false) is Embedding<float> e
+                    ? e.Vector
+                    : throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), SingleStoreModelBuilder.SupportedVectorTypes)),
+
+            _ => vectorProperty.EmbeddingGenerator is null
+                ? throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), SingleStoreModelBuilder.SupportedVectorTypes))
+                : throw new InvalidOperationException(VectorDataStrings.IncompatibleEmbeddingGeneratorWasConfiguredForInputType(typeof(TInput), vectorProperty.EmbeddingGenerator.GetType()))
+        };
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = SingleStoreSqlBuilder.SelectVectorSearch(connection,
+            _databaseName,
+            Name,
+            _model,
+            vectorProperty,
+            vector,
+            options.Filter,
+            options.Skip,
+            options.IncludeVectors,
+            top,
+            options.ScoreThreshold);
+
+        await using var reader = await connection.ExecuteWithErrorHandlingAsync(
+            _collectionMetadata,
+            "Search",
+            () => command.ExecuteReaderAsync(cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadWithErrorHandlingAsync(_collectionMetadata, "Search", cancellationToken).ConfigureAwait(false))
+        {
+            yield return new VectorSearchResult<TRecord>(
+                _mapper.MapFromStorageToDataModel(reader, options.IncludeVectors),
+                reader.GetDouble(reader.GetOrdinal(SingleStoreConstants.ScoreColumnName)));
+        }
     }
 
     /// <inheritdoc />

@@ -83,6 +83,18 @@ internal sealed class SingleStoreFilterTranslator : SqlFilterTranslator
             case decimal d:
                 _sql.Append(d.ToString(CultureInfo.InvariantCulture));
                 return;
+            case sbyte sb:
+                _sql.Append(sb.ToString(CultureInfo.InvariantCulture));
+                return;
+            case ushort us:
+                _sql.Append(us.ToString(CultureInfo.InvariantCulture));
+                return;
+            case uint ui:
+                _sql.Append(ui.ToString(CultureInfo.InvariantCulture));
+                return;
+            case ulong ul:
+                _sql.Append(ul.ToString(CultureInfo.InvariantCulture));
+                return;
 
             default:
                 base.TranslateConstant(value, isSearchCondition);

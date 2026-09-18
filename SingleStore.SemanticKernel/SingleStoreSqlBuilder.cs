@@ -110,6 +110,55 @@ internal static class SingleStoreSqlBuilder
         return command;
     }
 
+    internal static SingleStoreCommand SelectVectorSearch<TRecord>(SingleStoreConnection connection,
+        string database,
+        string table,
+        CollectionModel model,
+        VectorPropertyModel property,
+        object vectorValue,
+        Expression<Func<TRecord, bool>>? filter,
+        int skip,
+        bool includeVectors,
+        int top,
+        double? scoreThreshold = null)
+    {
+        var command = connection.CreateCommand();
+
+        var columns = MapColumnsToSql(model.Properties, includeVectors);
+        var quotedVectorColumn = Builder.QuoteIdentifier(property.StorageName);
+        var (vectorOperator, order, score, thresholdSign) = MapVectorSearchToSql(property.DistanceFunction);
+        var (whereClause, whereClauseParameters) = MapFilterConditionToSql(model, filter);
+        var quotedTableName = QuoteTable(database, table);
+
+        if (scoreThreshold.HasValue)
+        {
+            if (whereClause.Length == 0)
+            {
+                whereClause = $"WHERE {SingleStoreConstants.ScoreColumnName} {thresholdSign} @scoreThreshold";
+            }
+            else
+            {
+                whereClause = $"{whereClause} AND {SingleStoreConstants.ScoreColumnName} {thresholdSign} @scoreThreshold";
+            }
+
+            command.Parameters.Add(new SingleStoreParameter("@scoreThreshold", scoreThreshold.Value));
+        }
+
+        command.CommandText = $"SELECT {columns}, {quotedVectorColumn} {vectorOperator} @vector AS {SingleStoreConstants.DistanceColumnName}, {score} AS {SingleStoreConstants.ScoreColumnName}\n" +
+                              $"FROM {quotedTableName}\n" +
+                              $"{whereClause}\n" +
+                              $"ORDER BY {SingleStoreConstants.DistanceColumnName} {order}\n" +
+                              $"LIMIT {top} OFFSET {skip}";
+
+        command.Parameters.Add(new SingleStoreParameter("@vector", vectorValue));
+        foreach (var parameter in whereClauseParameters)
+        {
+            command.Parameters.Add(parameter);
+        }
+
+        return command;
+    }
+
     internal static SingleStoreCommand DeleteBatch<TKey>(SingleStoreConnection connection,
         string database,
         string table,
@@ -235,6 +284,23 @@ internal static class SingleStoreSqlBuilder
                               $"{string.Join(",\n  ", keys)}" +
                               "\n)";
         return command;
+    }
+
+    private static (string Operator, string Order, string Score, string ThresholdSign) MapVectorSearchToSql(string? distanceFunction)
+    {
+        return distanceFunction switch
+        {
+            DistanceFunction.EuclideanDistance =>
+                new ValueTuple<string, string, string, string>("<->", "ASC", SingleStoreConstants.DistanceColumnName, "<="),
+            DistanceFunction.EuclideanSquaredDistance =>
+                new ValueTuple<string, string, string, string>("<->", "ASC", $"POW({SingleStoreConstants.DistanceColumnName}, 2)", "<="),
+            DistanceFunction.NegativeDotProductSimilarity =>
+                new ValueTuple<string, string, string, string>("<*>", "DESC", $"-({SingleStoreConstants.DistanceColumnName})", "<="),
+            DistanceFunction.DotProductSimilarity or null =>
+                new ValueTuple<string, string, string, string>("<*>", "DESC", SingleStoreConstants.DistanceColumnName, ">="),
+            _ => throw new NotSupportedException(
+                $"Distance function {distanceFunction} is not supported by this store.")
+        };
     }
 
     private static string MapColumnsToSql(IReadOnlyList<PropertyModel> columns, bool includeVectors)
