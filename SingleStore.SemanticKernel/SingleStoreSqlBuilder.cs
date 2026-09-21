@@ -149,10 +149,10 @@ internal static class SingleStoreSqlBuilder
             command.Parameters.Add(new SingleStoreParameter("@scoreThreshold", scoreThreshold.Value));
         }
 
-        var semanticOrder = $"{quotedVectorColumn} {vectorOperator} @vector {vectorOrder}";
+        var semanticScore = $"{quotedVectorColumn} {vectorOperator} @vector";
         command.Parameters.Add(new SingleStoreParameter("@vector", vectorValue));
 
-        var keywordOrder = $"BM25({quotedTableName}, @BM25exp) DESC";
+        var keywordScore = $"BM25({quotedTableName}, @BM25exp)";
         command.Parameters.Add(new SingleStoreParameter("@BM25exp", BuildBm25Expression(textProperty.StorageName, keywords)));
 
         var (whereClause, whereClauseParameters) = MapFilterConditionToSql(model, filter);
@@ -165,17 +165,23 @@ internal static class SingleStoreSqlBuilder
             ? $"WHERE MATCH (TABLE {quotedTableName}) AGAINST (@BM25exp)"
             : $"{whereClause} AND MATCH (TABLE {quotedTableName}) AGAINST (@BM25exp)";
 
-        var semanticSearchSubquery = $"SELECT {quotedKeyColumn} AS {SingleStoreConstants.HybridSearchId}, RANK() OVER (ORDER BY {semanticOrder}) as {SingleStoreConstants.HybridSearchRank}\n" +
+        var semanticSearchSubquery = $"SELECT {SingleStoreConstants.HybridSearchId}, RANK() OVER (ORDER BY {SingleStoreConstants.ScoreColumnName} {vectorOrder}) as {SingleStoreConstants.HybridSearchRank}\n" +
+                                     $"FROM (\n" +
+                                     $"SELECT {quotedKeyColumn} AS {SingleStoreConstants.HybridSearchId}, {semanticScore} AS {SingleStoreConstants.ScoreColumnName}\n" +
                                      $"FROM {quotedTableName}\n" +
                                      $"{whereClause}\n" +
-                                     $"ORDER BY {semanticOrder}\n" +
-                                     $"LIMIT {internalLimit}";
+                                     $"ORDER BY {SingleStoreConstants.ScoreColumnName} {vectorOrder}\n" +
+                                     $"LIMIT {internalLimit}" +
+                                     $")\n";
 
-        var keywordSearchSubquery = $"SELECT {quotedKeyColumn} AS {SingleStoreConstants.HybridSearchId}, RANK() OVER (ORDER BY {keywordOrder}) as {SingleStoreConstants.HybridSearchRank}\n" +
+        var keywordSearchSubquery = $"SELECT {SingleStoreConstants.HybridSearchId}, RANK() OVER (ORDER BY {SingleStoreConstants.ScoreColumnName} DESC) as {SingleStoreConstants.HybridSearchRank}\n" +
+                                    $"FROM (\n" +
+                                    $"SELECT {quotedKeyColumn} AS {SingleStoreConstants.HybridSearchId}, {keywordScore} AS {SingleStoreConstants.ScoreColumnName}\n" +
                                     $"FROM {quotedTableName}\n" +
                                     $"{whereClauseKeywordSearch}\n" +
-                                    $"ORDER BY {keywordOrder}\n" +
-                                    $"LIMIT {internalLimit}";
+                                    $"ORDER BY {SingleStoreConstants.ScoreColumnName} DESC\n" +
+                                    $"LIMIT {internalLimit}" +
+                                    $")\n";
 
         var scoreFormula = $"COALESCE(1.0/({rrfConstant}+{SingleStoreConstants.SemanticSearchSubquery}.{SingleStoreConstants.HybridSearchRank}), 0.0) + COALESCE(1.0/({rrfConstant}+{SingleStoreConstants.KeywordSearchSubquery}.{SingleStoreConstants.HybridSearchRank}), 0.0)";
 
@@ -399,7 +405,7 @@ internal static class SingleStoreSqlBuilder
 
         return $"{EscapeBm25Field(columnName)}:({string.Join(" ", keywords.Select(EscapeBm25Keyword).ToList())})";
     }
-    
+
     private static (string Operator, string Order, string Score, string ThresholdSign) MapVectorSearchToSql(string? distanceFunction)
     {
         return distanceFunction switch

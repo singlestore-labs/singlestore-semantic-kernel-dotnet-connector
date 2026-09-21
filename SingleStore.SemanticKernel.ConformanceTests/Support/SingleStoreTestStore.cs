@@ -69,7 +69,7 @@ public class SingleStoreTestStore : TestStore
             _useExternalInstance = false;
         }
 
-        CreateDatabase(connectionStringBuilder);
+        PrepareDatabase(connectionStringBuilder);
         connectionStringBuilder.Database = DefaultDatabase;
         connectionStringBuilder.AllowLoadLocalInfile = true;
         _connectionString = connectionStringBuilder.ConnectionString;
@@ -81,7 +81,7 @@ public class SingleStoreTestStore : TestStore
         DefaultVectorStore = new SingleStoreVectorStore(_dataSource, false);
     }
 
-    private void CreateDatabase(SingleStoreConnectionStringBuilder connectionStringBuilder)
+    private void PrepareDatabase(SingleStoreConnectionStringBuilder connectionStringBuilder)
     {
         using var conn = new SingleStoreConnection(connectionStringBuilder.ConnectionString);
         conn.Open();

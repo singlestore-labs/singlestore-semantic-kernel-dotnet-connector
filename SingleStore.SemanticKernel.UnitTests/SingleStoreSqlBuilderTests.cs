@@ -388,19 +388,25 @@ public class SingleStoreSqlBuilderTests : IDisposable
                 COALESCE(1.0/(60+sk_s2_semantik_search.sk_s2_hybrid_search_rank), 0.0) + COALESCE(1.0/(60+sk_s2_keyword_search.sk_s2_hybrid_search_rank), 0.0)  AS sk_s2_score
                 FROM
                 (
-                SELECT `HotelId` AS sk_s2_hybrid_search_id, RANK() OVER (ORDER BY `DescriptionEmbedding` <-> @vector ASC) as sk_s2_hybrid_search_rank
+                SELECT sk_s2_hybrid_search_id, RANK() OVER (ORDER BY sk_s2_score ASC) as sk_s2_hybrid_search_rank
+                FROM (
+                SELECT `HotelId` AS sk_s2_hybrid_search_id, `DescriptionEmbedding` <-> @vector AS sk_s2_score
                 FROM `testdb`.`hotels`
 
-                ORDER BY `DescriptionEmbedding` <-> @vector ASC
-                LIMIT 20
+                ORDER BY sk_s2_score ASC
+                LIMIT 20)
+
                 ) AS sk_s2_semantik_search
                 FULL OUTER JOIN
                 (
-                SELECT `HotelId` AS sk_s2_hybrid_search_id, RANK() OVER (ORDER BY BM25(`testdb`.`hotels`, @BM25exp) DESC) as sk_s2_hybrid_search_rank
+                SELECT sk_s2_hybrid_search_id, RANK() OVER (ORDER BY sk_s2_score DESC) as sk_s2_hybrid_search_rank
+                FROM (
+                SELECT `HotelId` AS sk_s2_hybrid_search_id, BM25(`testdb`.`hotels`, @BM25exp) AS sk_s2_score
                 FROM `testdb`.`hotels`
                 WHERE MATCH (TABLE `testdb`.`hotels`) AGAINST (@BM25exp)
-                ORDER BY BM25(`testdb`.`hotels`, @BM25exp) DESC
-                LIMIT 20
+                ORDER BY sk_s2_score DESC
+                LIMIT 20)
+
                 ) AS sk_s2_keyword_search
                 ON sk_s2_semantik_search.sk_s2_hybrid_search_id = sk_s2_keyword_search.sk_s2_hybrid_search_id
                 JOIN `testdb`.`hotels`
@@ -442,19 +448,25 @@ public class SingleStoreSqlBuilderTests : IDisposable
                 COALESCE(1.0/(60+sk_s2_semantik_search.sk_s2_hybrid_search_rank), 0.0) + COALESCE(1.0/(60+sk_s2_keyword_search.sk_s2_hybrid_search_rank), 0.0)  AS sk_s2_score
                 FROM
                 (
-                SELECT `HotelId` AS sk_s2_hybrid_search_id, RANK() OVER (ORDER BY `DescriptionEmbedding` <-> @vector ASC) as sk_s2_hybrid_search_rank
+                SELECT sk_s2_hybrid_search_id, RANK() OVER (ORDER BY sk_s2_score ASC) as sk_s2_hybrid_search_rank
+                FROM (
+                SELECT `HotelId` AS sk_s2_hybrid_search_id, `DescriptionEmbedding` <-> @vector AS sk_s2_score
                 FROM `testdb`.`hotels`
                 WHERE (`HotelCode` = 1)
-                ORDER BY `DescriptionEmbedding` <-> @vector ASC
-                LIMIT 50
+                ORDER BY sk_s2_score ASC
+                LIMIT 50)
+
                 ) AS sk_s2_semantik_search
                 FULL OUTER JOIN
                 (
-                SELECT `HotelId` AS sk_s2_hybrid_search_id, RANK() OVER (ORDER BY BM25(`testdb`.`hotels`, @BM25exp) DESC) as sk_s2_hybrid_search_rank
+                SELECT sk_s2_hybrid_search_id, RANK() OVER (ORDER BY sk_s2_score DESC) as sk_s2_hybrid_search_rank
+                FROM (
+                SELECT `HotelId` AS sk_s2_hybrid_search_id, BM25(`testdb`.`hotels`, @BM25exp) AS sk_s2_score
                 FROM `testdb`.`hotels`
                 WHERE (`HotelCode` = 1) AND MATCH (TABLE `testdb`.`hotels`) AGAINST (@BM25exp)
-                ORDER BY BM25(`testdb`.`hotels`, @BM25exp) DESC
-                LIMIT 50
+                ORDER BY sk_s2_score DESC
+                LIMIT 50)
+
                 ) AS sk_s2_keyword_search
                 ON sk_s2_semantik_search.sk_s2_hybrid_search_id = sk_s2_keyword_search.sk_s2_hybrid_search_id
                 JOIN `testdb`.`hotels`
@@ -499,9 +511,12 @@ public class SingleStoreSqlBuilderTests : IDisposable
             3);
 
         Assert.Contains(
-            $"RANK() OVER (ORDER BY `DescriptionEmbedding` {expectedOperator} @vector {expectedOrder}) as sk_s2_hybrid_search_rank",
+            $"SELECT `HotelId` AS sk_s2_hybrid_search_id, `DescriptionEmbedding` {expectedOperator} @vector AS sk_s2_score",
             command.CommandText);
-        Assert.Contains($"ORDER BY `DescriptionEmbedding` {expectedOperator} @vector {expectedOrder}\nLIMIT", command.CommandText);
+        Assert.Contains(
+            $"SELECT sk_s2_hybrid_search_id, RANK() OVER (ORDER BY sk_s2_score {expectedOrder}) as sk_s2_hybrid_search_rank",
+            command.CommandText);
+        Assert.Contains($"ORDER BY sk_s2_score {expectedOrder}\nLIMIT", command.CommandText);
     }
 
     [Fact]
