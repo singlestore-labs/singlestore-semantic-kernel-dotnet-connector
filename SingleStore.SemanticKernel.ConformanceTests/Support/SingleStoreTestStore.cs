@@ -86,12 +86,10 @@ public class SingleStoreTestStore : TestStore
         using var conn = new SingleStoreConnection(connectionStringBuilder.ConnectionString);
         conn.Open();
 
-        using var command = new SingleStoreCommand("SELECT @@memsql_version", conn);
-        var rawVersion = (string)command.ExecuteScalar()!;
-        ServerVersion = Version.Parse(rawVersion.Split('-', '+')[0]);
+        ServerVersion = Version.Parse(conn.S2ServerVersion.Split('-', '+')[0]);
 
         // Workaround for ECS-3820
-        command.CommandText = "SET GLOBAL vector_index_fallback_non_index_scan = false";
+        using var command = new SingleStoreCommand("SET GLOBAL vector_index_fallback_non_index_scan = false", conn);
         command.ExecuteNonQuery();
 
         command.CommandText = $"DROP DATABASE IF EXISTS {DefaultDatabase}";

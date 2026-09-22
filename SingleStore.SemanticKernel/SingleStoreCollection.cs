@@ -179,8 +179,8 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
         HybridSearchOptions<TRecord>? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default) where TInput : notnull
     {
-        Verify.NotNull(searchValue);
         Verify.NotNull(keywords);
+        Verify.NotLessThan(keywords.Count, 1);
         Verify.NotLessThan(top, 1);
 
         options ??= s_defaultHybridSearchOptions;
@@ -192,20 +192,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
         var vectorProperty = _model.GetVectorPropertyOrSingle(new VectorSearchOptions<TRecord> { VectorProperty = options.VectorProperty });
         var textProperty = _model.GetFullTextDataPropertyOrSingle(options.AdditionalProperty);
 
-        object vector = searchValue switch
-        {
-            ReadOnlyMemory<float> or float[] => searchValue,
-            Embedding<float> e => e.Vector,
-
-            _ when vectorProperty.EmbeddingGenerationDispatcher is not null
-                => await vectorProperty.GenerateEmbeddingAsync(searchValue, cancellationToken).ConfigureAwait(false) is Embedding<float> e
-                    ? e.Vector
-                    : throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), SingleStoreModelBuilder.SupportedVectorTypes)),
-
-            _ => vectorProperty.EmbeddingGenerator is null
-                ? throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), SingleStoreModelBuilder.SupportedVectorTypes))
-                : throw new InvalidOperationException(VectorDataStrings.IncompatibleEmbeddingGeneratorWasConfiguredForInputType(typeof(TInput), vectorProperty.EmbeddingGenerator.GetType()))
-        };
+        object vector = await SearchValueToVector(searchValue, vectorProperty, cancellationToken).ConfigureAwait(false);
 
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = SingleStoreSqlBuilder.SelectHybridSearch(connection,
@@ -228,7 +215,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
             () => command.ExecuteReaderAsync(cancellationToken),
             cancellationToken).ConfigureAwait(false);
 
-        while (await reader.ReadWithErrorHandlingAsync(_collectionMetadata, "Search", cancellationToken).ConfigureAwait(false))
+        while (await reader.ReadWithErrorHandlingAsync(_collectionMetadata, "HybridSearch", cancellationToken).ConfigureAwait(false))
         {
             yield return new VectorSearchResult<TRecord>(
                 _mapper.MapFromStorageToDataModel(reader, options.IncludeVectors),
@@ -404,6 +391,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
             "Delete",
             () => command.ExecuteNonQueryAsync(cancellationToken),
             cancellationToken).ConfigureAwait(false);
+        await FlushIfNeeded(connection, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -438,6 +426,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
             "DeleteBatch",
             () => command.ExecuteNonQueryAsync(cancellationToken),
             cancellationToken).ConfigureAwait(false);
+        await FlushIfNeeded(connection, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -544,17 +533,22 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
 
                 await Task.WhenAll(writeTask, loadTask).ConfigureAwait(false);
 
-                if (_hasFullTextIndex)
-                {
-                    // Push rows that the bulk load left in the rowstore into columnstore segments, so that they become visible to full-text search
-                    await using var optimizeCommand = SingleStoreSqlBuilder.OptimizeTableFlush(connection, _databaseName, Name);
-                    await connection.ExecuteWithErrorHandlingAsync(
-                        _collectionMetadata,
-                        "Optimize",
-                        () => optimizeCommand.ExecuteNonQueryAsync(cancellationToken),
-                        cancellationToken).ConfigureAwait(false);
-                }
+                await FlushIfNeeded(connection, cancellationToken).ConfigureAwait(false);
             });
+    }
+
+    private async Task FlushIfNeeded(SingleStoreConnection connection, CancellationToken cancellationToken)
+    {
+        if (_hasFullTextIndex || _model.VectorProperties.Count > 0)
+        {
+            // Push rows that bulk load or delete left in the rowstore into columnstore segments, so that they become visible to full-text search
+            await using var optimizeCommand = SingleStoreSqlBuilder.OptimizeTableFlush(connection, _databaseName, Name);
+            await connection.ExecuteWithErrorHandlingAsync(
+                _collectionMetadata,
+                "Optimize",
+                () => optimizeCommand.ExecuteNonQueryAsync(cancellationToken),
+                cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static async Task LoadAndCompleteReaderAsync(Task<int> loadTask, PipeReader reader)
@@ -588,20 +582,7 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
         }
 
         var vectorProperty = _model.GetVectorPropertyOrSingle(options);
-        object vector = searchValue switch
-        {
-            ReadOnlyMemory<float> or float[] => searchValue,
-            Embedding<float> e => e.Vector,
-
-            _ when vectorProperty.EmbeddingGenerationDispatcher is not null
-                => await vectorProperty.GenerateEmbeddingAsync(searchValue, cancellationToken).ConfigureAwait(false) is Embedding<float> e
-                    ? e.Vector
-                    : throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), SingleStoreModelBuilder.SupportedVectorTypes)),
-
-            _ => vectorProperty.EmbeddingGenerator is null
-                ? throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), SingleStoreModelBuilder.SupportedVectorTypes))
-                : throw new InvalidOperationException(VectorDataStrings.IncompatibleEmbeddingGeneratorWasConfiguredForInputType(typeof(TInput), vectorProperty.EmbeddingGenerator.GetType()))
-        };
+        object vector = await SearchValueToVector(searchValue, vectorProperty, cancellationToken).ConfigureAwait(false);
 
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = SingleStoreSqlBuilder.SelectVectorSearch(connection,
@@ -628,6 +609,26 @@ public class SingleStoreCollection<TKey, TRecord> : VectorStoreCollection<TKey, 
                 _mapper.MapFromStorageToDataModel(reader, options.IncludeVectors),
                 reader.GetDouble(reader.GetOrdinal(SingleStoreConstants.ScoreColumnName)));
         }
+    }
+
+    private async Task<object> SearchValueToVector<TInput>(TInput searchValue, VectorPropertyModel vectorProperty, CancellationToken cancellationToken)
+    {
+        Verify.NotNull(searchValue);
+
+        return searchValue switch
+        {
+            ReadOnlyMemory<float> or float[] => searchValue,
+            Embedding<float> e => e.Vector,
+
+            _ when vectorProperty.EmbeddingGenerationDispatcher is not null
+                => await vectorProperty.GenerateEmbeddingAsync(searchValue, cancellationToken).ConfigureAwait(false) is Embedding<float> e
+                    ? e.Vector
+                    : throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), SingleStoreModelBuilder.SupportedVectorTypes)),
+
+            _ => vectorProperty.EmbeddingGenerator is null
+                ? throw new NotSupportedException(VectorDataStrings.InvalidSearchInputAndNoEmbeddingGeneratorWasConfigured(searchValue.GetType(), SingleStoreModelBuilder.SupportedVectorTypes))
+                : throw new InvalidOperationException(VectorDataStrings.IncompatibleEmbeddingGeneratorWasConfiguredForInputType(typeof(TInput), vectorProperty.EmbeddingGenerator.GetType()))
+        };
     }
 
     /// <inheritdoc />
