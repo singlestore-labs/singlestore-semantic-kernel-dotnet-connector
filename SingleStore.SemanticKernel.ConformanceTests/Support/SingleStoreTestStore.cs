@@ -33,6 +33,10 @@ public class SingleStoreTestStore : TestStore
 
     public static SingleStoreTestStore Instance { get; } = new();
 
+    public Version ServerVersion { get; private set; } = new(0, 0);
+
+    public bool SupportsMultiValueHashIndex => ServerVersion.Major >= 9;
+
     public SingleStoreVectorStore GetVectorStore(SingleStoreVectorStoreOptions options)
     {
         // The DataSource is shared with the static instance, we don't want any of the tests to dispose it.
@@ -65,7 +69,7 @@ public class SingleStoreTestStore : TestStore
             _useExternalInstance = false;
         }
 
-        CreateDatabase(connectionStringBuilder);
+        PrepareDatabase(connectionStringBuilder);
         connectionStringBuilder.Database = DefaultDatabase;
         connectionStringBuilder.AllowLoadLocalInfile = true;
         _connectionString = connectionStringBuilder.ConnectionString;
@@ -77,15 +81,38 @@ public class SingleStoreTestStore : TestStore
         DefaultVectorStore = new SingleStoreVectorStore(_dataSource, false);
     }
 
-    private void CreateDatabase(SingleStoreConnectionStringBuilder connectionStringBuilder)
+    private void PrepareDatabase(SingleStoreConnectionStringBuilder connectionStringBuilder)
     {
         using var conn = new SingleStoreConnection(connectionStringBuilder.ConnectionString);
         conn.Open();
 
-        using var command = new SingleStoreCommand($"DROP DATABASE IF EXISTS {DefaultDatabase}", conn);
+        ServerVersion = Version.Parse(conn.S2ServerVersion.Split('-', '+')[0]);
+
+        // Workaround for ECS-3820
+        using var command = new SingleStoreCommand("SET GLOBAL vector_index_fallback_non_index_scan = false", conn);
+        command.ExecuteNonQuery();
+
+        command.CommandText = $"DROP DATABASE IF EXISTS {DefaultDatabase}";
         command.ExecuteNonQuery();
         command.CommandText = $"CREATE DATABASE {DefaultDatabase}";
         command.ExecuteNonQuery();
+    }
+
+    internal void DisableUnsupportedJsonIndexes(IEnumerable<VectorStoreProperty> properties)
+    {
+        if (SupportsMultiValueHashIndex)
+        {
+            return;
+        }
+
+        foreach (var property in properties)
+        {
+            if (property is VectorStoreDataProperty dataProperty
+                && (dataProperty.Type == typeof(string[]) || dataProperty.Type == typeof(List<string>)))
+            {
+                dataProperty.IsIndexed = false;
+            }
+        }
     }
 
     protected override async Task StopAsync()

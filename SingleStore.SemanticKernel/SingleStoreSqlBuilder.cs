@@ -110,6 +110,101 @@ internal static class SingleStoreSqlBuilder
         return command;
     }
 
+    internal static SingleStoreCommand SelectHybridSearch<TRecord>(SingleStoreConnection connection,
+        string database,
+        string table,
+        CollectionModel model,
+        VectorPropertyModel vectorProperty,
+        DataPropertyModel textProperty,
+        object vectorValue,
+        ICollection<string> keywords,
+        Expression<Func<TRecord, bool>>? filter,
+        int skip,
+        bool includeVectors,
+        int top,
+        double? scoreThreshold = null)
+    {
+        var command = connection.CreateCommand();
+
+        var quotedKeyColumn = Builder.QuoteIdentifier(model.KeyProperty.StorageName);
+        var quotedTableName = QuoteTable(database, table);
+        var quotedVectorColumn = Builder.QuoteIdentifier(vectorProperty.StorageName);
+        var (vectorOperator, vectorOrder, _, _) = MapVectorSearchToSql(vectorProperty.DistanceFunction);
+        var columns = MapColumnsToSql(model.Properties, includeVectors);
+
+        // Use a larger internal limit for subqueries to get better ranking, then limit final results
+        var internalLimit = (top + skip) * 2;
+        if (internalLimit < 20)
+        {
+            internalLimit = 20;
+        }
+
+        // RRF constant - higher values give more weight to lower-ranked results
+        const int rrfConstant = 60;
+
+        var thresholdClause = "";
+        if (scoreThreshold != null)
+        {
+            thresholdClause = $"WHERE {SingleStoreConstants.ScoreColumnName} >= @scoreThreshold";
+            command.Parameters.Add(new SingleStoreParameter("@scoreThreshold", scoreThreshold.Value));
+        }
+
+        var semanticScore = $"{quotedVectorColumn} {vectorOperator} @vector";
+        command.Parameters.Add(new SingleStoreParameter("@vector", vectorValue));
+
+        var keywordScore = $"BM25({quotedTableName}, @BM25exp)";
+        command.Parameters.Add(new SingleStoreParameter("@BM25exp", BuildBm25Expression(textProperty.StorageName, keywords)));
+
+        var (whereClause, whereClauseParameters) = MapFilterConditionToSql(model, filter);
+        foreach (var parameter in whereClauseParameters)
+        {
+            command.Parameters.Add(parameter);
+        }
+
+        var whereClauseKeywordSearch = whereClause.Length == 0
+            ? $"WHERE MATCH (TABLE {quotedTableName}) AGAINST (@BM25exp)"
+            : $"{whereClause} AND MATCH (TABLE {quotedTableName}) AGAINST (@BM25exp)";
+
+        var semanticSearchSubquery = $"SELECT {SingleStoreConstants.HybridSearchId}, RANK() OVER (ORDER BY {SingleStoreConstants.ScoreColumnName} {vectorOrder}) as {SingleStoreConstants.HybridSearchRank}\n" +
+                                     $"FROM (\n" +
+                                     $"SELECT {quotedKeyColumn} AS {SingleStoreConstants.HybridSearchId}, {semanticScore} AS {SingleStoreConstants.ScoreColumnName}\n" +
+                                     $"FROM {quotedTableName}\n" +
+                                     $"{whereClause}\n" +
+                                     $"ORDER BY {SingleStoreConstants.ScoreColumnName} {vectorOrder}\n" +
+                                     $"LIMIT {internalLimit}" +
+                                     $")\n";
+
+        var keywordSearchSubquery = $"SELECT {SingleStoreConstants.HybridSearchId}, RANK() OVER (ORDER BY {SingleStoreConstants.ScoreColumnName} DESC) as {SingleStoreConstants.HybridSearchRank}\n" +
+                                    $"FROM (\n" +
+                                    $"SELECT {quotedKeyColumn} AS {SingleStoreConstants.HybridSearchId}, {keywordScore} AS {SingleStoreConstants.ScoreColumnName}\n" +
+                                    $"FROM {quotedTableName}\n" +
+                                    $"{whereClauseKeywordSearch}\n" +
+                                    $"ORDER BY {SingleStoreConstants.ScoreColumnName} DESC\n" +
+                                    $"LIMIT {internalLimit}" +
+                                    $")\n";
+
+        var scoreFormula = $"COALESCE(1.0/({rrfConstant}+{SingleStoreConstants.SemanticSearchSubquery}.{SingleStoreConstants.HybridSearchRank}), 0.0) + COALESCE(1.0/({rrfConstant}+{SingleStoreConstants.KeywordSearchSubquery}.{SingleStoreConstants.HybridSearchRank}), 0.0)";
+
+        command.CommandText = $"SELECT {columns},\n" +
+                              $"{scoreFormula}  AS {SingleStoreConstants.ScoreColumnName}\n" +
+                              $"FROM\n" +
+                              $"(\n" +
+                              $"{semanticSearchSubquery}\n" +
+                              $") AS {SingleStoreConstants.SemanticSearchSubquery}\n" +
+                              $"FULL OUTER JOIN\n" +
+                              $"(\n" +
+                              $"{keywordSearchSubquery}\n" +
+                              $") AS {SingleStoreConstants.KeywordSearchSubquery}\n" +
+                              $"ON {SingleStoreConstants.SemanticSearchSubquery}.{SingleStoreConstants.HybridSearchId} = {SingleStoreConstants.KeywordSearchSubquery}.{SingleStoreConstants.HybridSearchId}\n" +
+                              $"JOIN {quotedTableName}\n" +
+                              $"ON {quotedTableName}.{quotedKeyColumn} = COALESCE({SingleStoreConstants.SemanticSearchSubquery}.{SingleStoreConstants.HybridSearchId}, {SingleStoreConstants.KeywordSearchSubquery}.{SingleStoreConstants.HybridSearchId})\n" +
+                              $"{thresholdClause}\n" +
+                              $"ORDER BY {SingleStoreConstants.ScoreColumnName} DESC\n" +
+                              $"LIMIT {top} OFFSET {skip}";
+
+        return command;
+    }
+
     internal static SingleStoreCommand SelectVectorSearch<TRecord>(SingleStoreConnection connection,
         string database,
         string table,
@@ -205,6 +300,14 @@ internal static class SingleStoreSqlBuilder
         return command;
     }
 
+    internal static SingleStoreCommand OptimizeTableFlush(SingleStoreConnection connection, string database, string table)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText = $"OPTIMIZE TABLE {QuoteTable(database, table)} FLUSH";
+
+        return command;
+    }
+
     internal static string QuoteTable(string database, string table)
     {
         var quotedDatabase = Builder.QuoteIdentifier(database);
@@ -284,6 +387,23 @@ internal static class SingleStoreSqlBuilder
                               $"{string.Join(",\n  ", keys)}" +
                               "\n)";
         return command;
+    }
+
+    private static string BuildBm25Expression(string columnName, IEnumerable<string> keywords)
+    {
+        const string bm25SpecialCharacters = @"\+-!():^[]""{}~*?|&/ ";
+
+        static string EscapeBm25Field(string columnName)
+        {
+            return string.Concat(columnName.Select(c => bm25SpecialCharacters.Contains(c) ? $"\\{c}" : c.ToString()));
+        }
+
+        static string EscapeBm25Keyword(string keyword)
+        {
+            return $"\"{keyword.Replace(@"\", @"\\").Replace("\"", "\\\"")}\"";
+        }
+
+        return $"{EscapeBm25Field(columnName)}:({string.Join(" ", keywords.Select(EscapeBm25Keyword).ToList())})";
     }
 
     private static (string Operator, string Order, string Score, string ThresholdSign) MapVectorSearchToSql(string? distanceFunction)
