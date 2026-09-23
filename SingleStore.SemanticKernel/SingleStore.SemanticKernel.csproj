@@ -2,12 +2,24 @@
 
     <PropertyGroup>
         <TargetFrameworks>net10.0;net8.0;netstandard2.0;net472</TargetFrameworks>
+        <Description>SingleStore vector store connector for Microsoft Semantic Kernel and Microsoft.Extensions.VectorData.</Description>
+        <Copyright>Copyright 2026 SingleStore Inc.</Copyright>
+        <Authors>SingleStore Inc.</Authors>
+        <PackageId>SingleStore.SemanticKernel</PackageId>
+        <RepositoryUrl>https://github.com/singlestore-labs/singlestore-semantic-kernel-dotnet-connector</RepositoryUrl>
+        <PackageTags>SingleStore;VectorData;VectorSearch;Semantic Kernel</PackageTags>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
         <LangVersion>latest</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <PolySharpIncludeRuntimeSupportedAttributes>true</PolySharpIncludeRuntimeSupportedAttributes>
         <NoWarn>$(NoWarn);MEVD9001</NoWarn>
     </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.VectorData.Abstractions" Version="10.8.0"/>
