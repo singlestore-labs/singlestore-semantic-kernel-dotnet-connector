@@ -203,3 +203,24 @@ CREATE TABLE IF NOT EXISTS `db`.`Hotels`
     VECTOR KEY (`hotel_description_embedding`) INDEX_OPTIONS '{ "metric_type":"EUCLIDEAN_DISTANCE", "index_type":"HNSW_FLAT" }'
 );
 ```
+
+## Release process
+
+To release a new version push a version tag using semantic versioning with a `v` prefix (`v<major>.<minor>.<patch>`, for
+example `v1.2.3`):
+
+```bash
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+The package version is derived from the tag (the leading `v` is stripped). This triggers
+the [CI workflow](.github/workflows/ci.yml), which:
+
+- Runs the test matrix
+- Builds the connector with the release version
+- Signs `SingleStore.SemanticKernel.dll` with Azure Artifact Signing
+- Packs the signed assemblies into a NuGet package and publishes it
+  to [NuGet.org](https://www.nuget.org/packages/SingleStore.SemanticKernel)
+- Creates a [GitHub Release](https://github.com/singlestore-labs/singlestore-semantic-kernel-dotnet-connector/releases)
+  with auto-generated release notes and the package (`SingleStore.SemanticKernel.<version>.nupkg`)
