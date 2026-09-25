@@ -12,10 +12,10 @@ Models (LLMs) like OpenAI, Azure OpenAI, and Hugging Face with conventional prog
 Java. Semantic Kernel achieves this by allowing you to define plugins that can be chained together in just a few lines
 of code.
 
-Semantic Kernel and .NET provides an abstraction for interacting with Vector Stores and a list of out-of-the-box
-connectors that implement these abstractions. Features include creating, listing and deleting collections of records,
-and uploading, retrieving and deleting records. The abstraction makes it easy to experiment with a free or locally
-hosted Vector Store and then switch to a service when needing to scale up.
+Semantic Kernel and .NET provide an abstraction for interacting with Vector Stores and a list of out-of-the-box
+connectors that implement these abstractions. Features include creating, listing, and deleting collections of records,
+and uploading, retrieving, and deleting records. The abstraction makes it easy to experiment with a free or locally
+hosted Vector Store and then switch to a service when there is a need to scale up.
 
 This repository contains the official SingleStore Vector Store Connector implementation for Semantic Kernel.
 
@@ -76,7 +76,7 @@ kernelBuilder.Services.AddSingleStoreVectorStore("<Connection String>");
 ```
 
 Where `<Connection String>` is a connection string to the SingleStore instance, in the format
-that [SingleStore .NET Connector](https://docs.singlestore.com/cloud/developer-resources/connect-with-application-development-tools/connect-with-net-and-net-core/#configure-the-connection)
+that [SingleStore .NET Connector](https://docs.singlestore.com/cloud/csharp/)
 expects, for example `Host=localhost;Port=3306;Database=db;Username=root;Password=secret`.
 
 Extension methods that take no parameters are also provided. These require an instance of `SingleStoreDataSource` to be
@@ -131,12 +131,11 @@ var collection = new SingleStoreCollection<int, Hotel>("<Connection String>", "s
 
 ## Data mapping
 
-The SingleStore Store connector provides a default mapper when mapping from the data model to storage. This mapper does
-a direct conversion of the list of properties on the data model to the columns in SingleStore.
+The SingleStore Store connector provides a default mapper when mapping from the data model to storage. This mapper directly converts the list of properties defined in the data model to columns in SingleStore.
 
 The following table shows the default key and data property type mapping:
 
-| C# Data Type   | Database Type     |
+| C# Data Type   | SingleStore Type  |
 |----------------|-------------------|
 | bool           | TINYINT           |
 | byte           | TINYINT UNSIGNED  |
@@ -164,7 +163,7 @@ Vector properties are mapped to `VECTOR(dimensions, F32)`.
 
 ### Property name override
 
-You can provide override field names to use in storage that is different from the property names on the data model. This
+You can specify a storage field name that differs from the corresponding property name in the data model. This
 allows you to match table column names even if they don't match the property names on the data model.
 
 The property name override is done by setting the `StorageName` option via the data model attributes or record
