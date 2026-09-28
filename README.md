@@ -1,5 +1,9 @@
 # SingleStore connector for Microsoft Semantic Kernel
 
+**Attention**: The code in this repository is intended for experimental use only and is not fully tested, documented, or
+supported by SingleStore. Visit the [SingleStore Forums](https://www.singlestore.com/forum/) to ask questions about this
+repository.
+
 Repository for `SingleStore.SemanticKernel`, the official
 SingleStore [Vector Store Connector](https://learn.microsoft.com/en-us/semantic-kernel/concepts/vector-store-connectors/?pivots=programming-language-csharp)
 for
@@ -131,7 +135,8 @@ var collection = new SingleStoreCollection<int, Hotel>("<Connection String>", "s
 
 ## Data mapping
 
-The SingleStore Vector Store connector provides a default mapper when mapping from the data model to storage. This mapper directly converts the list of properties defined in the data model to columns in SingleStore.
+The SingleStore Vector Store connector provides a default mapper when mapping from the data model to storage. This
+mapper directly converts the list of properties defined in the data model to columns in SingleStore.
 
 The following table shows the default key and data property type mapping:
 
@@ -163,8 +168,8 @@ Vector properties are mapped to `VECTOR(dimensions, F32)`.
 
 ### Property name override
 
-You can specify a storage field name that differs from the corresponding property name in the data model. This
-allows you to match table column names even if they don't match the property names on the data model.
+You can specify a storage field name that differs from the corresponding property name in the data model. This allows
+you to match table column names even if they don't match the property names on the data model.
 
 The property name override is done by setting the `StorageName` option via the data model attributes or record
 definition.
@@ -225,7 +230,8 @@ the [CI workflow](.github/workflows/ci.yml), which:
 - Signs `SingleStore.SemanticKernel.dll` with Azure Artifact Signing
 - Packs the signed assemblies into a NuGet package and publishes it
   to [NuGet.org](https://www.nuget.org/packages/SingleStore.SemanticKernel)
-- Creates a draft [GitHub Release](https://github.com/singlestore-labs/singlestore-semantic-kernel-dotnet-connector/releases)
+- Creates a
+  draft [GitHub Release](https://github.com/singlestore-labs/singlestore-semantic-kernel-dotnet-connector/releases)
   with auto-generated release notes and the package (`SingleStore.SemanticKernel.<version>.nupkg`)
 
 ### 2. Publish the draft release
