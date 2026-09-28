@@ -1,0 +1,4 @@
+business_justification: >
+  This is a Semantic Kernel Vector Store (driver) for SingleStore.
+license: Apache-2.0
+primary_contact: AdalbertMemSQL
