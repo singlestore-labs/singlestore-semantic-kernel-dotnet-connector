@@ -1,6 +1,6 @@
 # SingleStore connector for Microsoft Semantic Kernel
 
-Repository for `SingleStore.SemanticKernel` the official
+Repository for `SingleStore.SemanticKernel`, the official
 SingleStore [Vector Store Connector](https://learn.microsoft.com/en-us/semantic-kernel/concepts/vector-store-connectors/?pivots=programming-language-csharp)
 for
 [Microsoft Semantic Kernel](https://learn.microsoft.com/en-us/semantic-kernel/overview/).
