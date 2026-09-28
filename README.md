@@ -131,7 +131,7 @@ var collection = new SingleStoreCollection<int, Hotel>("<Connection String>", "s
 
 ## Data mapping
 
-The SingleStore Store connector provides a default mapper when mapping from the data model to storage. This mapper directly converts the list of properties defined in the data model to columns in SingleStore.
+The SingleStore Vector Store connector provides a default mapper when mapping from the data model to storage. This mapper directly converts the list of properties defined in the data model to columns in SingleStore.
 
 The following table shows the default key and data property type mapping:
 
