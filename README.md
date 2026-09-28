@@ -206,8 +206,11 @@ CREATE TABLE IF NOT EXISTS `db`.`Hotels`
 
 ## Release process
 
-To release a new version push a version tag using semantic versioning with a `v` prefix (`v<major>.<minor>.<patch>`, for
-example `v1.2.3`):
+Releasing a new version takes two steps.
+
+### 1. Push a version tag
+
+Push a version tag using semantic versioning with a `v` prefix (`v<major>.<minor>.<patch>`, for example `v1.2.3`):
 
 ```bash
 git tag v1.0.1
@@ -222,5 +225,11 @@ the [CI workflow](.github/workflows/ci.yml), which:
 - Signs `SingleStore.SemanticKernel.dll` with Azure Artifact Signing
 - Packs the signed assemblies into a NuGet package and publishes it
   to [NuGet.org](https://www.nuget.org/packages/SingleStore.SemanticKernel)
-- Creates a [GitHub Release](https://github.com/singlestore-labs/singlestore-semantic-kernel-dotnet-connector/releases)
+- Creates a draft [GitHub Release](https://github.com/singlestore-labs/singlestore-semantic-kernel-dotnet-connector/releases)
   with auto-generated release notes and the package (`SingleStore.SemanticKernel.<version>.nupkg`)
+
+### 2. Publish the draft release
+
+After the workflow succeeds, open the
+[Releases page](https://github.com/singlestore-labs/singlestore-semantic-kernel-dotnet-connector/releases), review the
+draft release for the new tag (edit the notes if needed), and click **Publish release**.

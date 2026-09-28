@@ -4,7 +4,10 @@ on:
   pull_request:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+env:
+  DOTNET_VERSION: 10.0.x
 
 jobs:
   fetch-s2-versions:
@@ -47,7 +50,7 @@ jobs:
       - name: Install .NET SDKs
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Run unit tests
         run: dotnet test SingleStore.SemanticKernel.UnitTests/SingleStore.SemanticKernel.UnitTests.csproj --framework net10.0 --configuration Release
@@ -80,7 +83,7 @@ jobs:
       - name: Install .NET SDKs
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Run unit tests
         run: dotnet test SingleStore.SemanticKernel.UnitTests/SingleStore.SemanticKernel.UnitTests.csproj --framework net472 --configuration Release
@@ -94,7 +97,7 @@ jobs:
   
   release:
     needs: [ubuntu-tests, windows-tests]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref_type == 'tag'
     runs-on: windows-latest
     permissions:
       id-token: write
@@ -107,7 +110,7 @@ jobs:
       - name: Install .NET SDKs
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Set version
         shell: bash
@@ -154,6 +157,7 @@ jobs:
       - name: Release on GitHub
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
+          draft: true
           generate_release_notes: true
           files: SingleStore.SemanticKernel/bin/Release/SingleStore.SemanticKernel.${{ env.RELEASE_VERSION }}.nupkg
           fail_on_unmatched_files: true
