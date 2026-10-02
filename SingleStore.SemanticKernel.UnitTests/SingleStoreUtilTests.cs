@@ -45,4 +45,28 @@ public class SingleStoreUtilTests
 
         Assert.True(new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).AllowLoadLocalInfile);
     }
+
+    [Fact]
+    public void CreateDataSource_WhenAbsent_SetsConnectionAttributes()
+    {
+        using var dataSource = SingleStoreUtil.CreateDataSource("Host=localhost;Database=testdb;");
+
+        var connectorVersion = typeof(SingleStoreUtil).Assembly.GetName().Version!.ToString(3);
+        var attributes = new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).ConnectionAttributes;
+
+        Assert.Equal(
+            $"_connector_name:SingleStore Semantic Kernel .NET Connector,_connector_version:{connectorVersion},_product_version:10.8.0",
+            attributes);
+    }
+
+    [Fact]
+    public void CreateDataSource_WhenPresent_LeavesConnectionAttributesUnchanged()
+    {
+        const string connectionAttributes = "_connector_name:custom,_connector_version:0.1.0,_product_version:9.0.0";
+
+        using var dataSource = SingleStoreUtil.CreateDataSource(
+            $"Host=localhost;Database=testdb;ConnectionAttributes={connectionAttributes};");
+
+        Assert.Equal(connectionAttributes, new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).ConnectionAttributes);
+    }
 }
