@@ -47,17 +47,20 @@ The connector has the following characteristics.
 ## Limitations
 
 > [!IMPORTANT]
-> When initializing `SingleStoreDataSource` manually, it is necessary to set `AllowLoadLocalInfile=true`. This enables
-LOAD DATA LOCAL INFILE support. Without this, record uploading will fail.
+> When initializing `SingleStoreDataSource` manually, it is necessary to set `AllowLoadLocalInfile=true` and
+`ConnectionAttributes`.
+> `AllowLoadLocalInfile=true` enables LOAD DATA LOCAL INFILE support. Without this, record uploading will fail.
+> Set `ConnectionAttributes` to `_connector_name:SingleStore Semantic Kernel .NET Connector`.
+> SingleStore uses `ConnectionAttributes` to collect usage information and prioritize connector development.
 
-Here is an example of how to set `AllowLoadLocalInfile`.
+Here is an example of how to set `AllowLoadLocalInfile` and `ConnectionAttributes`.
 
 ```csharp
-SingleStoreDataSource dataSource = new("Host=localhost;Port=3306;Username=root;Password=example;Database=db;AllowLoadLocalInfile=true");
+SingleStoreDataSource dataSource = new("Host=localhost;Port=3306;Username=root;Password=example;Database=db;AllowLoadLocalInfile=true;ConnectionAttributes=_connector_name:SingleStore Semantic Kernel .NET Connector");
 ```
 
 When using the `AddSingleStoreVectorStore` dependency injection registration method with a connection string,
-`AllowLoadLocalInfile` is enabled automatically.
+`AllowLoadLocalInfile` and `ConnectionAttributes` are set automatically.
 
 ## Getting started
 
@@ -85,7 +88,7 @@ expects, for example `Host=localhost;Port=3306;Database=db;Username=root;Passwor
 
 Extension methods that take no parameters are also provided. These require an instance of `SingleStoreDataSource` to be
 separately registered with the dependency injection container. To upload records, ensure that `AllowLoadLocalInfile` is
-enabled:
+enabled and `ConnectionAttributes` is set:
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
@@ -95,7 +98,7 @@ using SingleStoreConnector;
 // Using IServiceCollection with ASP.NET Core.
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<SingleStoreDataSource>(sp =>
-    new SingleStoreDataSource("<Connection String>;AllowLoadLocalInfile=true"));
+    new SingleStoreDataSource("<Connection String>;AllowLoadLocalInfile=true;ConnectionAttributes=_connector_name:SingleStore Semantic Kernel .NET Connector"));
 builder.Services.AddSingleStoreVectorStore();
 ```
 
@@ -105,7 +108,7 @@ You can construct a SingleStore Vector Store instance directly with a custom dat
 using SingleStore.SemanticKernel;
 using SingleStoreConnector;
 
-SingleStoreDataSource dataSource = new("<Connection String>;AllowLoadLocalInfile=true");
+SingleStoreDataSource dataSource = new("<Connection String>;AllowLoadLocalInfile=true;ConnectionAttributes=_connector_name:SingleStore Semantic Kernel .NET Connector");
 var vectorStore = new SingleStoreVectorStore(dataSource, ownsDataSource: true);
 ```
 
@@ -122,7 +125,7 @@ string.
 using SingleStore.SemanticKernel;
 using SingleStoreConnector;
 
-SingleStoreDataSource dataSource = new("<Connection String>;AllowLoadLocalInfile=true");
+SingleStoreDataSource dataSource = new("<Connection String>;AllowLoadLocalInfile=true;ConnectionAttributes=_connector_name:SingleStore Semantic Kernel .NET Connector");
 
 var collection = new SingleStoreCollection<int, Hotel>(dataSource, "skhotels", ownsDataSource: true);
 ```
