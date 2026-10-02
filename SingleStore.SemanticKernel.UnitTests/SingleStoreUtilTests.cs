@@ -69,4 +69,18 @@ public class SingleStoreUtilTests
 
         Assert.Equal(connectionAttributes, new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).ConnectionAttributes);
     }
+
+    [Fact]
+    public void CreateDataSource_WhenPartial_AppendsMissingConnectionAttributes()
+    {
+        using var dataSource = SingleStoreUtil.CreateDataSource(
+            "Host=localhost;Database=testdb;ConnectionAttributes=program_name:myapp");
+
+        var connectorVersion = typeof(SingleStoreUtil).Assembly.GetName().Version!.ToString(3);
+        var attributes = new SingleStoreConnectionStringBuilder(dataSource.ConnectionString).ConnectionAttributes;
+
+        Assert.Equal(
+            $"program_name:myapp,_connector_name:SingleStore Semantic Kernel .NET Connector,_connector_version:{connectorVersion},_product_version:10.8.0",
+            attributes);
+    }
 }

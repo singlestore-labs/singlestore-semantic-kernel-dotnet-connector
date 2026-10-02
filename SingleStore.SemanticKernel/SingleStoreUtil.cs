@@ -15,11 +15,16 @@ internal static class SingleStoreUtil
             builder.AllowLoadLocalInfile = true;
         }
 
-        if (!builder.ContainsKey("ConnectionAttributes"))
+        if (!builder.ConnectionAttributes.Contains("_connector_name"))
         {
+            if (builder.ConnectionAttributes.Length > 0)
+            {
+                builder.ConnectionAttributes += ",";
+            }
+
             var semanticKernelVersion = typeof(VectorStore).Assembly.GetName().Version!.ToString(3);
             var singlestoreConnectorVersion = typeof(SingleStoreUtil).Assembly.GetName().Version!.ToString(3);
-            builder.ConnectionAttributes = $"_connector_name:SingleStore Semantic Kernel .NET Connector,_connector_version:{singlestoreConnectorVersion},_product_version:{semanticKernelVersion}";
+            builder.ConnectionAttributes += $"_connector_name:SingleStore Semantic Kernel .NET Connector,_connector_version:{singlestoreConnectorVersion},_product_version:{semanticKernelVersion}";
         }
 
         return new SingleStoreDataSource(builder.ConnectionString);
